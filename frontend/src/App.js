@@ -22,24 +22,20 @@ export default function SocialPracticeSimulator() {
   const [showHints, setShowHints] = useState(false);
   const [analytics, setAnalytics] = useState(null);
   const [conversationStats, setConversationStats] = useState({
-    turnCount: 0,
-    avgResponseTime: 0,
-    socialCuesDetected: []
-  });
-  
-  // ADD THESE NEW STATE VARIABLES:
-  const [sensorySettings, setSensorySettings] = useState({
-    reducedMotion: false,
-    muteAudio: false,
-    simplifiedUI: false,
-    fontSize: 'normal'
-  });
-  
-  const recognitionRef = useRef(null);
-  const messagesEndRef = useRef(null);
-  
-  const recognitionRef = useRef(null);
-  const messagesEndRef = useRef(null);
+  turnCount: 0,
+  avgResponseTime: 0,
+  socialCuesDetected: []
+});
+
+const [sensorySettings, setSensorySettings] = useState({
+  reducedMotion: false,
+  muteAudio: false,
+  simplifiedUI: false,
+  fontSize: 'normal'
+});
+
+const recognitionRef = useRef(null);
+const messagesEndRef = useRef(null);
 
  useEffect(() => {
   // eslint-disable-next-line no-undef
