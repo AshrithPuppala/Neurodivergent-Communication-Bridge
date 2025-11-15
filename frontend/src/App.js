@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
-import { Mic, MicOff, MessageSquare, BarChart3, TrendingUp } from 'lucide-react';
+import { Mic, MicOff, MessageSquare, BarChart3, TrendingUp, ArrowLeft } from 'lucide-react';
 
 const API_URL = 'https://neurodivergent-communication-bridge-4neh.onrender.com';
 
@@ -12,7 +12,8 @@ const scenarios = [
   { id: 'study_group', name: 'Study Group Discussion', context: 'educational', difficulty: 'easy', description: 'Collaborate in a study group' }
 ];
 
-export default function SocialPracticeSimulator() {
+// CHANGE 1: Add onBack prop
+export default function SocialPracticeSimulator({ onBack }) {
   const [view, setView] = useState('selection');
   const [selectedScenario, setSelectedScenario] = useState(null);
   const [sessionId, setSessionId] = useState(null);
@@ -199,9 +200,9 @@ export default function SocialPracticeSimulator() {
   };
 
   const renderSensoryControls = () => (
-  <div className="bg-white rounded-lg shadow p-4 mb-4">
-    <h3 className="font-bold text-sm text-gray-700 mb-3">🎨 Comfort Settings</h3>
-    <div className="space-y-2">
+    <div className="bg-white rounded-lg shadow p-4 mb-4">
+      <h3 className="font-bold text-sm text-gray-700 mb-3">🎨 Comfort Settings</h3>
+      <div className="space-y-2">
         <label className="flex items-center gap-2 cursor-pointer text-sm">
           <input 
             type="checkbox" 
@@ -491,9 +492,21 @@ export default function SocialPracticeSimulator() {
     </div>
   );
 
+  // CHANGE 2: Add back button to scenario selection
   const renderScenarioSelection = () => (
     <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 p-8">
       <div className="max-w-6xl mx-auto">
+        {/* BACK BUTTON - Only show if onBack prop exists */}
+        {onBack && (
+          <button
+            onClick={onBack}
+            className="flex items-center gap-2 text-gray-600 hover:text-gray-800 mb-6 transition-colors"
+          >
+            <ArrowLeft size={20} />
+            <span className="font-medium">Back to Home</span>
+          </button>
+        )}
+
         <div className="text-center mb-12">
           <h1 className="text-5xl font-bold text-gray-800 mb-4">Social Practice Simulator</h1>
           <p className="text-xl text-gray-600">Build confidence through realistic AI-powered conversations</p>
@@ -642,112 +655,111 @@ export default function SocialPracticeSimulator() {
             </div>
             
             <div className="bg-white rounded-xl p-6 shadow-lg">
-          <h3 className="text-xl font-bold text-gray-800 mb-4">📊 Detailed Metrics</h3>
-          <div className="grid md:grid-cols-2 gap-4">
-            <div>
-              <p className="text-sm text-gray-600">Empathy Score</p>
-              <div className="flex items-center gap-2 mt-1">
-                <div className="flex-1 bg-gray-200 rounded-full h-3">
-                  <div 
-                    className="bg-green-500 h-3 rounded-full transition-all"
-                    style={{width: `${analytics.empathyScore}%`}}
-                  ></div>
-                </div>
-                <span className="text-sm font-bold text-gray-700">{analytics.empathyScore}%</span>
-              </div>
-            </div>
-            
-            <div>
-              <p className="text-sm text-gray-600">Clarity Score</p>
-              <div className="flex items-center gap-2 mt-1">
-                <div className="flex-1 bg-gray-200 rounded-full h-3">
-                  <div 
-                    className="bg-blue-500 h-3 rounded-full transition-all"
-                    style={{width: `${analytics.clarityScore}%`}}
-                  ></div>
-                </div>
-                <span className="text-sm font-bold text-gray-700">{analytics.clarityScore}%</span>
-              </div>
-            </div>
-            
-            <div>
-              <p className="text-sm text-gray-600">Engagement Score</p>
-              <div className="flex items-center gap-2 mt-1">
-                <div className="flex-1 bg-gray-200 rounded-full h-3">
-                  <div 
-                    className="bg-purple-500 h-3 rounded-full transition-all"
-                    style={{width: `${analytics.engagementScore}%`}}
-                  ></div>
-                </div>
-                <span className="text-sm font-bold text-gray-700">{analytics.engagementScore}%</span>
-              </div>
-            </div>
-            
-            <div>
-              <p className="text-sm text-gray-600">Appropriateness Score</p>
-              <div className="flex items-center gap-2 mt-1">
-                <div className="flex-1 bg-gray-200 rounded-full h-3">
-                  <div 
-                    className="bg-orange-500 h-3 rounded-full transition-all"
-                    style={{width: `${analytics.appropriatenessScore}%`}}
-                  ></div>
-                </div>
-                <span className="text-sm font-bold text-gray-700">{analytics.appropriatenessScore}%</span>
-              </div>
-            </div>
-            
-            {analytics.emotionalRegulationScore && (
-              <div>
-                <p className="text-sm text-gray-600">Emotional Regulation Score</p>
-                <div className="flex items-center gap-2 mt-1">
-                  <div className="flex-1 bg-gray-200 rounded-full h-3">
-                    <div 
-                      className="bg-pink-500 h-3 rounded-full transition-all"
-                      style={{width: `${analytics.emotionalRegulationScore}%`}}
-                    ></div>
+              <h3 className="text-xl font-bold text-gray-800 mb-4">📊 Detailed Metrics</h3>
+              <div className="grid md:grid-cols-2 gap-4">
+                <div>
+                  <p className="text-sm text-gray-600">Empathy Score</p>
+                  <div className="flex items-center gap-2 mt-1">
+                    <div className="flex-1 bg-gray-200 rounded-full h-3">
+                      <div 
+                        className="bg-green-500 h-3 rounded-full transition-all"
+                        style={{width: `${analytics.empathyScore}%`}}
+                      ></div>
+                    </div>
+                    <span className="text-sm font-bold text-gray-700">{analytics.empathyScore}%</span>
                   </div>
-                  <span className="text-sm font-bold text-gray-700">{analytics.emotionalRegulationScore}%</span>
                 </div>
+                
+                <div>
+                  <p className="text-sm text-gray-600">Clarity Score</p>
+                  <div className="flex items-center gap-2 mt-1">
+                    <div className="flex-1 bg-gray-200 rounded-full h-3">
+                      <div 
+                        className="bg-blue-500 h-3 rounded-full transition-all"
+                        style={{width: `${analytics.clarityScore}%`}}
+                      ></div>
+                    </div>
+                    <span className="text-sm font-bold text-gray-700">{analytics.clarityScore}%</span>
+                  </div>
+                </div>
+                
+                <div>
+                  <p className="text-sm text-gray-600">Engagement Score</p>
+                  <div className="flex items-center gap-2 mt-1">
+                    <div className="flex-1 bg-gray-200 rounded-full h-3">
+                      <div 
+                        className="bg-purple-500 h-3 rounded-full transition-all"
+                        style={{width: `${analytics.engagementScore}%`}}
+                      ></div>
+                    </div>
+                    <span className="text-sm font-bold text-gray-700">{analytics.engagementScore}%</span>
+                  </div>
+                </div>
+                
+                <div>
+                  <p className="text-sm text-gray-600">Appropriateness Score</p>
+                  <div className="flex items-center gap-2 mt-1">
+                    <div className="flex-1 bg-gray-200 rounded-full h-3">
+                      <div 
+                        className="bg-orange-500 h-3 rounded-full transition-all"
+                        style={{width: `${analytics.appropriatenessScore}%`}}
+                      ></div>
+                    </div>
+                    <span className="text-sm font-bold text-gray-700">{analytics.appropriatenessScore}%</span>
+                  </div>
+                </div>
+                
+                {analytics.emotionalRegulationScore && (
+                  <div>
+                    <p className="text-sm text-gray-600">Emotional Regulation Score</p>
+                    <div className="flex items-center gap-2 mt-1">
+                      <div className="flex-1 bg-gray-200 rounded-full h-3">
+                        <div 
+                          className="bg-pink-500 h-3 rounded-full transition-all"
+                          style={{width: `${analytics.emotionalRegulationScore}%`}}
+                        ></div>
+                      </div>
+                      <span className="text-sm font-bold text-gray-700">{analytics.emotionalRegulationScore}%</span>
+                    </div>
+                  </div>
+                )}
+              </div>
+            </div>
+            
+            {analytics.strengths && analytics.strengths.length > 0 && (
+              <div className="bg-green-50 rounded-xl p-6 shadow-lg border-2 border-green-200">
+                <h3 className="text-xl font-bold text-gray-800 mb-4">💪 Your Strengths</h3>
+                <ul className="space-y-2">
+                  {analytics.strengths.map((strength, idx) => (
+                    <li key={idx} className="flex items-center gap-2 text-gray-700">
+                      <span className="text-green-600">✓</span>
+                      {strength}
+                    </li>
+                  ))}
+                </ul>
               </div>
             )}
           </div>
-        </div>
-        
-        {analytics.strengths && analytics.strengths.length > 0 && (
-          <div className="bg-green-50 rounded-xl p-6 shadow-lg border-2 border-green-200">
-            <h3 className="text-xl font-bold text-gray-800 mb-4">💪 Your Strengths</h3>
-            <ul className="space-y-2">
-              {analytics.strengths.map((strength, idx) => (
-                <li key={idx} className="flex items-center gap-2 text-gray-700">
-                  <span className="text-green-600">✓</span>
-                  {strength}
-                </li>
-              ))}
-            </ul>
-          </div>
         )}
-      </div>
-    )}
-      
-    
-    <div className="flex justify-center gap-4 mt-8">
-      <button
-        onClick={() => {
-          setView('selection');
-          setMessages([]);
-          setSessionId(null);
-          setAnalytics(null);
-          setConversationStats({
-            turnCount: 0,
-            avgResponseTime: 0,
-            socialCuesDetected: []
-          });
-        }}
-        className="bg-indigo-600 text-white px-8 py-3 rounded-lg hover:bg-indigo-700 transition-colors font-semibold"
-      >
-        Practice Another Scenario
-      </button>
-    </div>
+        
+        <div className="flex justify-center gap-4 mt-8">
+          <button
+            onClick={() => {
+              setView('selection');
+              setMessages([]);
+              setSessionId(null);
+              setAnalytics(null);
+              setConversationStats({
+                turnCount: 0,
+                avgResponseTime: 0,
+                socialCuesDetected: []
+              });
+            }}
+            className="bg-indigo-600 text-white px-8 py-3 rounded-lg hover:bg-indigo-700 transition-colors font-semibold"
+          >
+            Practice Another Scenario
+          </button>
+        </div>
       </div>
     </div>
   );
