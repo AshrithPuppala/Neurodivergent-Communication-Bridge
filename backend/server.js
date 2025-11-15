@@ -98,11 +98,14 @@ app.post('/api/start-session', async (req, res) => {
       initialMessage,
       socialCues: config.socialCues
     });
-  } catch (error) {
-    console.error('Error starting session:', error);
-    res.status(500).json({ error: 'Failed to start session' });
-  }
-});
+} catch (error) {
+  console.error('❌ Error in conversation:', error.message);
+  res.status(500).json({ 
+    error: 'Failed to process message', 
+    details: error.message,
+    hint: 'Check if GOOGLE_API_KEY is set in environment variables'
+  });
+}
 
 app.post('/api/conversation', async (req, res) => {
   try {
@@ -178,18 +181,27 @@ async function callGemini(prompt, conversationHistory = null) {
   const API_KEY = process.env.GOOGLE_API_KEY;
   
   if (!API_KEY) {
+    console.error('❌ GOOGLE_API_KEY not set in environment variables!');
     throw new Error('GOOGLE_API_KEY not configured');
   }
   
+  console.log('✅ Calling Gemini API...');
   const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-pro:generateContent?key=${API_KEY}`;
   
-  const response = await fetch(url, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ contents })
-  });
-  
-  const data = await response.json();
+ const response = await fetch(url, {
+  method: 'POST',
+  headers: { 'Content-Type': 'application/json' },
+  body: JSON.stringify({ contents })
+});
+
+if (!response.ok) {
+  const errorData = await response.json();
+  console.error('❌ Gemini API Error:', errorData);
+  throw new Error(`Gemini API error: ${JSON.stringify(errorData)}`);
+}
+
+const data = await response.json();
+console.log('✅ Gemini API response received');
   
   if (data.candidates && data.candidates[0] && data.candidates[0].content) {
     return data.candidates[0].content.parts[0].text;
