@@ -1,7 +1,6 @@
 const express = require('express');
 const cors = require('cors');
 const { v4: uuidv4 } = require('uuid');
-const { HfInference } = require('@huggingface/inference');
 
 const app = express();
 const PORT = process.env.PORT || 10000;
@@ -19,31 +18,50 @@ app.use(express.json());
 
 const sessions = new Map();
 
-// Initialize Hugging Face - FIXED SYNTAX
-const hf = new HfInference(process.env.HUGGING_FACE_API_KEY);
-
-// Emotion detection function
+// Emotion detection function using direct API call
 async function analyzeEmotion(text) {
   try {
-    const result = await hf.textClassification({
-      model: 'j-hartmann/emotion-english-distilroberta-base',
-      inputs: text
+    const response = await fetch('https://api-inference.huggingface.co/models/j-hartmann/emotion-english-distilroberta-base', {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${process.env.HUGGING_FACE_API_KEY}`,
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({ inputs: text })
     });
-    return result;
+    
+    if (!response.ok) {
+      console.error('Emotion API error:', await response.text());
+      return null;
+    }
+    
+    const result = await response.json();
+    return result[0]; // Returns array of emotions
   } catch (error) {
     console.error('Emotion analysis error:', error);
     return null;
   }
 }
 
-// Detect sarcasm
+// Detect sarcasm using direct API call
 async function detectSarcasm(text) {
   try {
-    const result = await hf.textClassification({
-      model: 'mrm8488/t5-base-finetuned-sarcasm-twitter',
-      inputs: text
+    const response = await fetch('https://api-inference.huggingface.co/models/mrm8488/t5-base-finetuned-sarcasm-twitter', {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${process.env.HUGGING_FACE_API_KEY}`,
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({ inputs: text })
     });
-    return result;
+    
+    if (!response.ok) {
+      console.error('Sarcasm API error:', await response.text());
+      return null;
+    }
+    
+    const result = await response.json();
+    return result[0];
   } catch (error) {
     console.error('Sarcasm detection error:', error);
     return null;
@@ -144,9 +162,6 @@ app.get('/', (req, res) => {
 app.get('/api/health', (req, res) => {
   res.json({ status: 'ok', activeConnections: sessions.size });
 });
-
-// ... rest of your endpoints (start-session, conversation, end-session)
-// Keep everything else as is, just fix the top section
 
 app.post('/api/start-session', async (req, res) => {
   try {
@@ -261,6 +276,7 @@ app.post('/api/conversation', async (req, res) => {
     });
   }
 });
+
 app.post('/api/end-session', async (req, res) => {
   try {
     const { sessionId } = req.body;
@@ -290,7 +306,7 @@ async function callGemini(prompt, conversationHistory = null) {
   }
   
   console.log('✅ Calling Gemini API...');
- const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${API_KEY}`;
+  const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash-exp:generateContent?key=${API_KEY}`;
   
   let contents;
   if (conversationHistory) {
@@ -360,9 +376,12 @@ HINTS: [list 1-2 helpful tips for the user's next response]`;
     { role: 'model', parts: [{ text: 'I understand. I will stay in character and provide social cues and hints.' }] }
   ];
   
-  // Add conversation messages
+  // Add conversation messages (remove emotion field that Gemini doesn't accept)
   session.messages.forEach(msg => {
-    conversationHistory.push(msg);
+    conversationHistory.push({
+      role: msg.role,
+      parts: msg.parts
+    });
   });
   
   const fullResponse = await callGemini(null, conversationHistory);
