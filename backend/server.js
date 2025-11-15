@@ -349,15 +349,11 @@ Evaluate based on: appropriate responses to social cues, empathy, clarity, engag
     duration: Math.floor(duration)
   };
 }
-
-// Root route for testing
-app.get('/', (req, res) => {
-  res.json({ 
-    message: 'Social Practice Simulator Backend API',
-    status: 'running',
-    endpoints: ['/api/health', '/api/start-session', '/api/conversation', '/api/end-session']
-  });
+// Root route
+app.get('/api/health', (req, res) => {
+  res.json({ status: 'ok', activeConnections: sessions.size });
 });
+
 app.listen(PORT, () => {
   console.log(`Social Practice Simulator backend running on port ${PORT}`);
   console.log(`Using Google Gemini API - Make sure GOOGLE_API_KEY is set`);
