@@ -31,13 +31,16 @@ export default function SocialPracticeSimulator() {
   const recognitionRef = useRef(null);
   const messagesEndRef = useRef(null);
 
-  useEffect(() => {
-    if ('webkitSpeechRecognition' in window) {
-      const recognition = new webkitSpeechRecognition();
-      recognition.continuous = true;
-      recognition.interimResults = true;
-      
-      recognition.onresult = (event) => {
+ useEffect(() => {
+  // eslint-disable-next-line no-undef
+  if ('webkitSpeechRecognition' in window) {
+    // eslint-disable-next-line no-undef
+    const recognition = new webkitSpeechRecognition();
+    recognition.continuous = true;
+    recognition.interimResults = true;
+    
+    recognition.onresult = (event) => {
+      // ... rest of code
         let interim = '';
         let final = '';
         
