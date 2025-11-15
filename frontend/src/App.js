@@ -360,6 +360,55 @@ const speakMessage = (text) => {
       </div>
     </div>
   );
+const renderScenarioSelection = () => (
+    <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 p-8">
+      <div className="max-w-6xl mx-auto">
+        <div className="text-center mb-12">
+          <h1 className="text-5xl font-bold text-gray-800 mb-4">Social Practice Simulator</h1>
+          <p className="text-xl text-gray-600">Build confidence through realistic AI-powered conversations</p>
+        </div>
+        
+        <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
+          {scenarios.map(scenario => (
+            <div key={scenario.id} className="bg-white rounded-xl shadow-lg p-6 hover:shadow-xl transition-shadow cursor-pointer" onClick={() => startConversation(scenario)}>
+              <div className="flex items-start justify-between mb-4">
+                <div className="bg-indigo-100 p-3 rounded-lg">
+                  <MessageSquare className="text-indigo-600" size={24} />
+                </div>
+                <span className={`px-3 py-1 rounded-full text-sm font-medium ${
+                  scenario.difficulty === 'easy' ? 'bg-green-100 text-green-700' :
+                  scenario.difficulty === 'medium' ? 'bg-yellow-100 text-yellow-700' :
+                  'bg-red-100 text-red-700'
+                }`}>
+                  {scenario.difficulty}
+                </span>
+              </div>
+              
+              <h3 className="text-xl font-bold text-gray-800 mb-2">{scenario.name}</h3>
+              <p className="text-gray-600 mb-4">{scenario.description}</p>
+              
+              <div className="flex items-center justify-between">
+                <span className="text-sm text-gray-500 capitalize">{scenario.context}</span>
+                <button className="bg-indigo-600 text-white px-4 py-2 rounded-lg hover:bg-indigo-700 transition-colors">
+                  Start
+                </button>
+              </div>
+            </div>
+          ))}
+        </div>
+      </div>
+    </div>
+  );
+
+  // Main return at the very end (around line 506)
+  return (
+    <div>
+      {view === 'selection' && renderScenarioSelection()}
+      {view === 'conversation' && renderConversation()}
+      {view === 'results' && renderResults()}
+    </div>
+  );
+}
 
   const renderResults = () => (
     <div className="min-h-screen bg-gradient-to-br from-indigo-50 to-purple-100 p-8">
