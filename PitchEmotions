@@ -1,0 +1,144 @@
+import os
+import numpy as np
+from flask import Flask, request, jsonify
+
+# --- Modern Library Imports ---
+import librosa  # Replaces pyAudioAnalysis's aIO and aF
+from transformers import pipeline # Replaces pyAudioAnalysis's aT
+import torch # Required by transformers
+
+# 1. Initialise Flask App
+app = Flask(__name__)
+UPLOAD_FOLDER = 'uploads'
+if not os.path.exists(UPLOAD_FOLDER):
+    os.makedirs(UPLOAD_FOLDER)
+app.config['UPLOAD_FOLDER'] = UPLOAD_FOLDER
+
+# --- 2. Load Emotion Model (ONCE at startup) ---
+# This is a huge performance improvement. We load the model
+# into memory once instead of on every API request.
+print("Loading Speech Emotion Recognition model...")
+emotion_classifier = pipeline(
+    "audio-classification", 
+    model="superb/wav2vec2-base-superb-er"
+)
+print("Emotion model loaded successfully.")
+
+# --- 3. Define the Core Analysis Function (Rewritten) ---
+
+def analyze_audio_modern(file_path):
+    """
+    Analyzes an audio file for pitch, tone, and emotion
+    using Librosa and Transformers.
+    """
+    
+    # --- Task 1: Read Audio (Replaced with Librosa) ---
+    try:
+        # librosa.load reads the file, converts to mono, and resamples
+        # We use sr=None to keep the original sample rate
+        x, Fs = librosa.load(file_path, sr=None, mono=True)
+        
+    except Exception as e:
+        return {"error": f"Error reading audio file: {e}"}
+
+    # --- Task 2: Pitch and Tone Analysis (Replaced with Librosa) ---
+    
+    # --- Pitch (F0) Analysis ---
+    # We use 'pyin' for fundamental frequency (pitch) estimation
+    f0, voiced_flag, voiced_probs = librosa.pyin(
+        x, 
+        fmin=librosa.note_to_hz('C2'), 
+        fmax=librosa.note_to_hz('C7')
+    )
+    # Get only f0 values where the frame is "voiced"
+    voiced_f0 = f0[voiced_flag]
+    avg_pitch = np.mean(voiced_f0) if len(voiced_f0) > 0 else 0.0
+    pitch_std_dev = np.std(voiced_f0) if len(voiced_f0) > 0 else 0.0
+
+    # --- Tone (Spectral Centroid) Analysis ---
+    # Spectral centroid is a good measure of "brightness" or "tone"
+    spectral_centroids = librosa.feature.spectral_centroid(y=x, sr=Fs)[0]
+    avg_tone = np.mean(spectral_centroids)
+    tone_std_dev = np.std(spectral_centroids)
+    
+    # --- Task 3: Emotion Analysis (Replaced with Transformers) ---
+    try:
+        # The pipeline can take the file path directly
+        # top_k=4 ensures we get probabilities for all classes
+        emotion_results = emotion_classifier(file_path, top_k=4)
+        
+        # The model's classes are: ['anger', 'happiness', 'neutral', 'sadness']
+        # This conveniently matches the old library's classes.
+        class_names = [d['label'] for d in emotion_results]
+        winning_emotion = emotion_results[0]['label'] # The one with the highest score
+        emotion_probabilities = {d['label']: d['score'] for d in emotion_results}
+
+    except Exception as e:
+        # This can fail for many reasons, e.g., audio is too short
+        winning_emotion = "Analysis Error"
+        emotion_probabilities = {"error": str(e)}
+        class_names = ['anger', 'happiness', 'neutral', 'sadness'] # Default list
+
+    # --- 4. Consolidate All Results ---
+    results = {
+        "pitch_analysis": {
+            "mean_pitch_hz": float(avg_pitch),
+            "pitch_std_dev_hz": float(pitch_std_dev),
+            "unit": "Hz",
+            "description": "Mean and standard deviation of fundamental frequency (F0) in voiced segments."
+        },
+        "tone_analysis": {
+            "mean_tone_brightness_hz": float(avg_tone),
+            "tone_brightness_std_dev_hz": float(tone_std_dev),
+            "unit": "Hz",
+            "description": "Mean and standard deviation of spectral centroid. Higher values = 'brighter' tone."
+        },
+        "emotion_analysis": {
+            "predicted_emotion": winning_emotion,
+            "probabilities": {k: float(v) for k, v in emotion_probabilities.items()} if isinstance(emotion_probabilities, dict) else emotion_probabilities,
+            "model_used": "superb/wav2vec2-base-superb-er (Hugging Face)",
+            "classes": class_names
+        }
+    }
+    
+    return results
+
+# --- 4. Define the Flask Route (Unchanged, just calls new function) ---
+
+@app.route('/analyze_speech', methods=['POST'])
+def handle_audio_upload():
+    if 'audio_file' not in request.files:
+        return jsonify({"error": "No audio_file part in the request"}), 400
+
+    file = request.files['audio_file'] # THIS 'audio_file' is the key in your postman
+    if file.filename == '':
+        return jsonify({"error": "No selected file"}), 400
+
+    if file:
+        temp_path = os.path.join(app.config['UPLOAD_FOLDER'], file.filename)
+        
+        try:
+            file.save(temp_path)
+            
+            # --- THIS IS THE ONLY LINE CHANGED IN THIS SECTION ---
+            analysis_results = analyze_audio_modern(temp_path)
+            # ---
+            
+            if "error" in analysis_results:
+                return jsonify(analysis_results), 500
+            
+            return jsonify(analysis_results), 200
+                
+        except Exception as e:
+            return jsonify({"error": f"An server error occurred: {e}"}), 500
+            
+        finally:
+            # Clean up: remove the temporary file
+            if os.path.exists(temp_path):
+                os.remove(temp_path)
+    
+    return jsonify({"error": "An unknown error occurred"}), 500
+
+# --- 5. Run the App ---
+if __name__ == '_main_':
+    app.run(debug=True, host='0.0.0.0', port=5000)   
