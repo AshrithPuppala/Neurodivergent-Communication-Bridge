@@ -70,6 +70,7 @@ function formatEmotionFeedback(emotions) {
   };
 }
 
+// After the last helper function (generatePersonalizedHints)
 function generatePersonalizedHints(emotion, baseHints, isSarcastic) {
   const hints = [...baseHints];
   
@@ -89,10 +90,10 @@ function generatePersonalizedHints(emotion, baseHints, isSarcastic) {
   }
   
   return hints;
-}
+}  // ← Make sure this closing brace exists!
 
-const scenarioConfigs = {
-  // ... rest of your code
+const scenarioConfigs = {  // ← This should come AFTER all functions
+  workplace_meeting: {
 
 const scenarioConfigs = {
   workplace_meeting: {
