@@ -306,7 +306,7 @@ async function callGemini(prompt, conversationHistory = null) {
   }
   
   console.log('✅ Calling Gemini API...');
-  const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash-exp:generateContent?key=${API_KEY}`;
+  const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-exp:generateContent?key=${API_KEY}`;
   
   let contents;
   if (conversationHistory) {
