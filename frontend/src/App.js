@@ -38,6 +38,56 @@ export default function SocialPracticeSimulator() {
   const recognitionRef = useRef(null);
   const messagesEndRef = useRef(null);
 
+  const handleUserMessage = useCallback(async (text) => {
+    if (!text.trim() || isProcessing) return;
+    
+    const userMessage = {
+      role: 'user',
+      content: text,
+      timestamp: Date.now()
+    };
+    
+    setMessages(prev => [...prev, userMessage]);
+    setIsProcessing(true);
+    
+    try {
+      const response = await fetch(`${API_URL}/api/conversation`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          sessionId,
+          userMessage: text
+        })
+      });
+      
+      const data = await response.json();
+      
+      const aiMessage = {
+        role: 'ai',
+        content: data.aiResponse,
+        cues: data.socialCues || [],
+        hints: data.hints || [],
+        userEmotionFeedback: data.userEmotionFeedback || null,
+        sarcasmWarning: data.sarcasmWarning || null,
+        timestamp: Date.now()
+      };
+      
+      setMessages(prev => [...prev, aiMessage]);
+      setConversationStats(data.stats);
+      
+      if (!sensorySettings.muteAudio) {
+        const utterance = new SpeechSynthesisUtterance(data.aiResponse);
+        utterance.rate = 0.9;
+        utterance.pitch = 1;
+        window.speechSynthesis.speak(utterance);
+      }
+    } catch (error) {
+      console.error('Error in conversation:', error);
+    }
+    
+    setIsProcessing(false);
+  }, [sessionId, isProcessing, sensorySettings.muteAudio]);
+
   useEffect(() => {
     if ('webkitSpeechRecognition' in window) {
       const SpeechRecognition = window.webkitSpeechRecognition;
@@ -72,7 +122,7 @@ export default function SocialPracticeSimulator() {
       
       recognitionRef.current = recognition;
     }
-  }, [sessionId]);
+  }, [handleUserMessage]);
 
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
@@ -99,7 +149,12 @@ export default function SocialPracticeSimulator() {
       }]);
       setView('conversation');
       
-      speakMessage(data.initialMessage);
+      if (!sensorySettings.muteAudio) {
+        const utterance = new SpeechSynthesisUtterance(data.initialMessage);
+        utterance.rate = 0.9;
+        utterance.pitch = 1;
+        window.speechSynthesis.speak(utterance);
+      }
     } catch (error) {
       console.error('Error starting session:', error);
       alert('Failed to start session. Make sure backend is running.');
@@ -116,60 +171,6 @@ export default function SocialPracticeSimulator() {
       recognitionRef.current?.start();
       setIsListening(true);
     }
-  };
-
-const handleUserMessage = useCallback(async (text) => {
-  if (!text.trim() || isProcessing) return;
-  
-  const userMessage = {
-    role: 'user',
-    content: text,
-    timestamp: Date.now()
-  };
-  
-  setMessages(prev => [...prev, userMessage]);
-  setIsProcessing(true);
-  
-  try {
-    const response = await fetch(`${API_URL}/api/conversation`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        sessionId,
-        userMessage: text
-      })
-    });
-    
-    const data = await response.json();
-    
-    const aiMessage = {
-      role: 'ai',
-      content: data.aiResponse,
-      cues: data.socialCues || [],
-      hints: data.hints || [],
-      userEmotionFeedback: data.userEmotionFeedback || null,
-      sarcasmWarning: data.sarcasmWarning || null,
-      timestamp: Date.now()
-    };
-    
-    setMessages(prev => [...prev, aiMessage]);
-    setConversationStats(data.stats);
-    
-    speakMessage(data.aiResponse);
-  } catch (error) {
-    console.error('Error in conversation:', error);
-  }
-  
-  setIsProcessing(false);
-}, [sessionId, isProcessing, sensorySettings.muteAudio]);
-
-  const speakMessage = (text) => {
-    if (sensorySettings.muteAudio) return;
-    
-    const utterance = new SpeechSynthesisUtterance(text);
-    utterance.rate = 0.9;
-    utterance.pitch = 1;
-    window.speechSynthesis.speak(utterance);
   };
 
   const endSession = async () => {
