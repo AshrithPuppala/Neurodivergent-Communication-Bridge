@@ -2,15 +2,10 @@
 const express = require('express');
 const cors = require('cors');
 const { v4: uuidv4 } = require('uuid');
+const { HfInference } = require('@huggingface/inference');
 
 const app = express();
 const PORT = process.env.PORT || 10000;
-const express = require('express');
-const cors = require('cors');
-const { v4: uuidv4 } = require('uuid');
-const { HfInference } = require('@huggingface/inference'); // ADD THIS LINE
-
-const app = express();
 
 app.use(cors({
   origin: [
@@ -23,11 +18,8 @@ app.use(cors({
 }));
 app.use(express.json());
 
-const sessions = new Map();
-
 // Initialize Hugging Face
 const hf = new HfInference(process.env.HUGGING_FACE_API_KEY);
-
 // Emotion detection function
 async function analyzeEmotion(text) {
   try {
