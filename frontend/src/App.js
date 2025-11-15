@@ -35,7 +35,8 @@ export default function SocialPracticeSimulator() {
   // eslint-disable-next-line no-undef
   if ('webkitSpeechRecognition' in window) {
     // eslint-disable-next-line no-undef
-    const recognition = new webkitSpeechRecognition();
+    const SpeechRecognition = window.webkitSpeechRecognition;
+    const recognition = new SpeechRecognition();
     recognition.continuous = true;
     recognition.interimResults = true;
     
