@@ -177,7 +177,7 @@ app.post('/api/start-session', async (req, res) => {
       id: sessionId,
       scenarioId,
       config,
-      messages: [],
+      conversationHistory: [],
       startTime: Date.now(),
       stats: {
         turnCount: 0,
@@ -189,12 +189,7 @@ app.post('/api/start-session', async (req, res) => {
     
     sessions.set(sessionId, session);
     
-    const initialMessage = await generateInitialMessage(config);
-    
-    session.messages.push({
-      role: 'model',
-      parts: [{ text: initialMessage }]
-    });
+    const initialMessage = await generateInitialMessage(config, session);
     
     res.json({
       sessionId,
@@ -227,12 +222,6 @@ app.post('/api/conversation', async (req, res) => {
     session.stats.lastMessageTime = Date.now();
     session.stats.turnCount++;
     
-    session.messages.push({
-      role: 'user',
-      parts: [{ text: userMessage }],
-      emotion: userEmotion
-    });
-    
     const { aiResponse, socialCues, hints } = await generateAIResponse(session, userMessage);
     
     // Detect sarcasm or ambiguity in AI response
@@ -241,12 +230,6 @@ app.post('/api/conversation', async (req, res) => {
     
     // Generate personalized hints
     const personalizedHints = generatePersonalizedHints(userEmotion, hints, isSarcastic);
-    
-    session.messages.push({
-      role: 'model',
-      parts: [{ text: aiResponse }],
-      sarcasmDetected: isSarcastic
-    });
     
     socialCues.forEach(cue => {
       if (!session.stats.socialCuesDetected.includes(cue)) {
@@ -296,100 +279,110 @@ app.post('/api/end-session', async (req, res) => {
   }
 });
 
-// Helper function to call Gemini API
-async function callGemini(prompt, conversationHistory = null) {
-  const API_KEY = process.env.GOOGLE_API_KEY;
+// Helper function to call Groq API
+async function callGroq(messages) {
+  const API_KEY = process.env.GROQ_API_KEY;
   
   if (!API_KEY) {
-    console.error('❌ GOOGLE_API_KEY not set in environment variables!');
-    throw new Error('GOOGLE_API_KEY not configured');
+    console.error('❌ GROQ_API_KEY not set in environment variables!');
+    throw new Error('GROQ_API_KEY not configured');
   }
   
-  console.log('✅ Calling Gemini API...');
-  const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-exp:generateContent?key=${API_KEY}`;
+  console.log('✅ Calling Groq API...');
   
-  let contents;
-  if (conversationHistory) {
-    contents = conversationHistory;
-  } else {
-    contents = [{
-      parts: [{ text: prompt }]
-    }];
-  }
-  
-  const response = await fetch(url, {
+  const response = await fetch('https://api.groq.com/openai/v1/chat/completions', {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ contents })
+    headers: {
+      'Authorization': `Bearer ${API_KEY}`,
+      'Content-Type': 'application/json'
+    },
+    body: JSON.stringify({
+      model: 'llama-3.3-70b-versatile',
+      messages: messages,
+      temperature: 0.7,
+      max_tokens: 1024
+    })
   });
 
   if (!response.ok) {
     const errorData = await response.json();
-    console.error('❌ Gemini API Error:', errorData);
-    throw new Error(`Gemini API error: ${JSON.stringify(errorData)}`);
+    console.error('❌ Groq API Error:', errorData);
+    throw new Error(`Groq API error: ${JSON.stringify(errorData)}`);
   }
 
   const data = await response.json();
-  console.log('✅ Gemini API response received');
+  console.log('✅ Groq API response received');
   
-  if (data.candidates && data.candidates[0] && data.candidates[0].content) {
-    return data.candidates[0].content.parts[0].text;
-  }
-  
-  throw new Error('Invalid response from Gemini API');
+  return data.choices[0].message.content;
 }
 
-async function generateInitialMessage(config) {
-  const prompt = `You are ${config.character} in this scenario: ${config.context}
+async function generateInitialMessage(config, session) {
+  const systemMessage = {
+    role: 'system',
+    content: `You are ${config.character} in this scenario: ${config.context}
 
 Your personality: ${config.personality}
 
-Generate a natural opening message to start the conversation. Keep it brief (2-3 sentences) and authentic to the scenario. Don't introduce yourself formally unless it's a first meeting scenario.`;
+Generate a natural opening message to start the conversation. Keep it brief (2-3 sentences) and authentic to the scenario. Don't introduce yourself formally unless it's a first meeting scenario.`
+  };
   
-  return await callGemini(prompt);
+  session.conversationHistory = [systemMessage];
+  
+  const response = await callGroq([systemMessage]);
+  
+  session.conversationHistory.push({
+    role: 'assistant',
+    content: response
+  });
+  
+  return response;
 }
 
 async function generateAIResponse(session, userMessage) {
   const config = session.config;
   
-  const systemPrompt = `You are ${config.character} in this scenario: ${config.context}
-
-Your personality: ${config.personality}
-
-Key social cues to display naturally: ${config.socialCues.join(', ')}
-
-Instructions:
-1. Stay in character throughout the conversation
-2. Respond naturally as this character would
-3. Display realistic emotions, reactions, and speech patterns
-4. Keep responses conversational (2-4 sentences typically)
-5. Show natural social cues through your tone and word choice
-6. React authentically to what the user says
-
-After your response, on a new line, add:
-SOCIAL_CUES: [list 1-3 social cues you displayed in this response]
-HINTS: [list 1-2 helpful tips for the user's next response]`;
-
-  // Build conversation history for Gemini
-  const conversationHistory = [
-    { role: 'user', parts: [{ text: systemPrompt }] },
-    { role: 'model', parts: [{ text: 'I understand. I will stay in character and provide social cues and hints.' }] }
-  ];
-  
-  // Add conversation messages (remove emotion field that Gemini doesn't accept)
-  session.messages.forEach(msg => {
-    conversationHistory.push({
-      role: msg.role,
-      parts: msg.parts
-    });
+  // Add user message to history
+  session.conversationHistory.push({
+    role: 'user',
+    content: userMessage
   });
   
-  const fullResponse = await callGemini(null, conversationHistory);
+  // Create instruction message for this turn
+  const instructionMessage = {
+    role: 'system',
+    content: `You are ${config.character}. Personality: ${config.personality}
+
+Key social cues to display: ${config.socialCues.join(', ')}
+
+Instructions:
+1. Stay in character
+2. Respond naturally (2-4 sentences)
+3. Display realistic emotions and reactions
+4. Show natural social cues
+
+After your response, on a new line add:
+SOCIAL_CUES: [list 1-3 social cues you displayed]
+HINTS: [list 1-2 helpful tips for the user's next response]`
+  };
   
-  // Parse response
+  const messages = [
+    session.conversationHistory[0], // Original system message
+    instructionMessage,
+    ...session.conversationHistory.slice(1) // All conversation so far
+  ];
+  
+  const fullResponse = await callGroq(messages);
+  
+  // Add AI response to history (without metadata)
   const parts = fullResponse.split('SOCIAL_CUES:');
   const aiResponse = parts[0].trim();
   
+  session.conversationHistory.push({
+    role: 'assistant',
+    content: aiResponse
+  });
+  
+  // Parse metadata
   let socialCues = [];
   let hints = [];
   
@@ -417,15 +410,16 @@ async function generateAnalytics(session) {
   const duration = (Date.now() - session.startTime) / 1000;
   const avgResponseTime = session.stats.responseTimes.reduce((a, b) => a + b, 0) / session.stats.responseTimes.length;
   
-  const transcript = session.messages
-    .filter(msg => msg.role === 'user' || msg.role === 'model')
+  const transcript = session.conversationHistory
+    .filter(msg => msg.role === 'user' || msg.role === 'assistant')
     .map(msg => {
-      const text = msg.parts[0].text;
-      return `${msg.role === 'user' ? 'User' : session.config.character}: ${text}`;
+      return `${msg.role === 'user' ? 'User' : session.config.character}: ${msg.content}`;
     })
     .join('\n\n');
   
-  const prompt = `Analyze this social skills practice conversation and provide detailed feedback.
+  const messages = [{
+    role: 'user',
+    content: `Analyze this social skills practice conversation and provide detailed feedback.
 
 Scenario: ${session.config.context}
 Number of turns: ${session.stats.turnCount}
@@ -453,10 +447,11 @@ Provide a JSON response with the following structure (respond ONLY with valid JS
   ]
 }
 
-Evaluate based on: appropriate responses to social cues, empathy, clarity, engagement level, and contextual appropriateness.`;
+Evaluate based on: appropriate responses to social cues, empathy, clarity, engagement level, and contextual appropriateness.`
+  }];
   
   try {
-    const analysisText = await callGemini(prompt);
+    const analysisText = await callGroq(messages);
     
     // Extract JSON from response
     const jsonMatch = analysisText.match(/\{[\s\S]*\}/);
@@ -498,5 +493,5 @@ Evaluate based on: appropriate responses to social cues, empathy, clarity, engag
 
 app.listen(PORT, () => {
   console.log(`Social Practice Simulator backend running on port ${PORT}`);
-  console.log(`Using Google Gemini API - Make sure GOOGLE_API_KEY is set`);
+  console.log(`Using Groq API - Make sure GROQ_API_KEY is set`);
 });
