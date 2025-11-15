@@ -32,9 +32,8 @@ except Exception as e:
 app = Flask(__name__)
 
 # IMPORTANT: Add CORS to allow frontend to communicate
-# Replace the CORS configuration with this:
 CORS(app, 
-     resources={r"/*": {"origins": "*"}},
+     resources={r"/*": {"origins": "*"}},  # Allow all origins for now
      allow_headers=["Content-Type"],
      methods=["GET", "POST", "OPTIONS"]
 )
@@ -224,5 +223,6 @@ def handle_conversation_analysis():
 
 # --- 7. Run the App ---
 if __name__ == '__main__':
-    print("Starting Flask server...")
-    app.run(debug=True, host='0.0.0.0', port=5000)
+    port = int(os.environ.get('PORT', 5000))
+    print(f"Starting Flask server on port {port}...")
+    app.run(debug=False, host='0.0.0.0', port=port)
