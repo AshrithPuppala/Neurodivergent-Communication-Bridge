@@ -68,47 +68,142 @@ async function detectSarcasm(text) {
   }
 }
 
-// Helper functions
+// Enhanced emotion feedback for neurodivergent users
 function formatEmotionFeedback(emotions) {
   if (!emotions || emotions.length === 0) return null;
   
   const topEmotion = emotions[0];
+  const secondEmotion = emotions[1];
+  
   const emotionEmojis = {
     joy: '😊',
     sadness: '😢',
     anger: '😠',
     fear: '😰',
     surprise: '😮',
-    neutral: '😐'
+    neutral: '😐',
+    disgust: '😖'
   };
+  
+  const emotionExplanations = {
+    joy: {
+      description: 'Your message sounds positive and cheerful',
+      tip: 'Great! Your enthusiasm comes through clearly',
+      impact: 'This tone helps build rapport and shows engagement'
+    },
+    sadness: {
+      description: 'Your message may sound down or disappointed',
+      tip: 'It\'s okay to express this, but consider if you want to adjust your tone',
+      impact: 'Others might respond with concern or support'
+    },
+    anger: {
+      description: 'Your message might come across as frustrated or upset',
+      tip: 'Take a breath. Consider rephrasing if this wasn\'t intended',
+      impact: 'This could make the other person defensive or uncomfortable'
+    },
+    fear: {
+      description: 'Your message may sound worried or anxious',
+      tip: 'It\'s okay to feel uncertain. You\'re doing great!',
+      impact: 'Others might try to reassure you'
+    },
+    surprise: {
+      description: 'Your message shows unexpected reaction',
+      tip: 'Your genuine reaction is clear',
+      impact: 'This can show you\'re engaged and interested'
+    },
+    neutral: {
+      description: 'Your message has a balanced, calm tone',
+      tip: 'Clear and professional communication',
+      impact: 'Good for formal or informational exchanges'
+    },
+    disgust: {
+      description: 'Your message might sound dismissive or disapproving',
+      tip: 'Consider if this matches your intention',
+      impact: 'This could create tension or hurt feelings'
+    }
+  };
+  
+  const emotionData = emotionExplanations[topEmotion.label] || emotionExplanations.neutral;
   
   return {
     emotion: topEmotion.label,
-    confidence: (topEmotion.score * 100).toFixed(0) + '%',
+    confidence: Math.round(topEmotion.score * 100),
     emoji: emotionEmojis[topEmotion.label] || '🙂',
-    message: `Your tone seems ${topEmotion.label}`
+    description: emotionData.description,
+    tip: emotionData.tip,
+    impact: emotionData.impact,
+    secondary: secondEmotion ? {
+      emotion: secondEmotion.label,
+      confidence: Math.round(secondEmotion.score * 100),
+      emoji: emotionEmojis[secondEmotion.label]
+    } : null,
+    allEmotions: emotions.slice(0, 3).map(e => ({
+      label: e.label,
+      percentage: Math.round(e.score * 100)
+    }))
   };
 }
 
-function generatePersonalizedHints(emotion, baseHints, isSarcastic) {
-  const hints = [...baseHints];
+// Generate highly personalized hints for neurodivergent users
+function generatePersonalizedHints(emotion, baseHints, isSarcastic, userMessage) {
+  const hints = [];
   
+  // Add base hints from AI
+  hints.push(...baseHints);
+  
+  // Emotion-based guidance
   if (emotion && emotion.length > 0) {
-    const topEmotion = emotion[0].label;
+    const topEmotion = emotion[0];
+    const emotionScore = topEmotion.score;
     
-    if (topEmotion === 'anger' || topEmotion === 'fear') {
-      hints.push("💙 Take a deep breath. It's okay to pause before responding.");
+    if (topEmotion.label === 'anger' && emotionScore > 0.5) {
+      hints.push("🧘 Emotion Check: Your response sounds angry. Take 3 deep breaths before continuing.");
+      hints.push("💡 Reframe Tip: Try starting with 'I understand...' or 'I see your point...'");
     }
-    if (topEmotion === 'sadness') {
-      hints.push("💚 You're doing great. Remember this is practice in a safe space.");
+    
+    if (topEmotion.label === 'fear' && emotionScore > 0.5) {
+      hints.push("💪 Confidence Boost: You're doing great! It's normal to feel uncertain.");
+      hints.push("🎯 Action: Focus on what you DO know, not what you don't.");
+    }
+    
+    if (topEmotion.label === 'sadness' && emotionScore > 0.5) {
+      hints.push("💚 Self-Care: Take your time. There's no rush in this conversation.");
+      hints.push("🌟 Remember: This is practice. Mistakes are learning opportunities.");
+    }
+    
+    if (topEmotion.label === 'joy' && emotionScore > 0.7) {
+      hints.push("✨ Great energy! Your enthusiasm is clear and engaging.");
+    }
+    
+    if (topEmotion.label === 'neutral' && emotionScore > 0.6) {
+      hints.push("📊 Balanced tone detected. This works well for professional settings.");
+      hints.push("💭 Consider: Would adding warmth help build connection?");
     }
   }
   
+  // Sarcasm detection with detailed explanation
   if (isSarcastic) {
-    hints.push("🔍 The other person may be using indirect language. Look for hidden meanings.");
+    hints.push("⚠️ SARCASM ALERT: The other person may be saying the opposite of what they mean.");
+    hints.push("🔍 Look for: Tone mismatch, exaggeration, or context clues that suggest irony.");
+    hints.push("💬 If unsure, it's okay to ask: 'Are you being serious or joking?'");
   }
   
-  return hints;
+  // Message length feedback
+  const wordCount = userMessage.trim().split(/\s+/).length;
+  if (wordCount < 3) {
+    hints.push("💬 Try elaborating more. Short responses can seem disengaged.");
+  } else if (wordCount > 50) {
+    hints.push("📝 Consider breaking long thoughts into smaller chunks for clarity.");
+  }
+  
+  // Question detection
+  if (userMessage.includes('?')) {
+    hints.push("❓ Good! Asking questions shows engagement and curiosity.");
+  } else if (hints.length < 4) {
+    hints.push("💡 Tip: Try asking a follow-up question to show interest.");
+  }
+  
+  return hints.slice(0, 5); // Limit to 5 most relevant hints
 }
 
 const scenarioConfigs = {
@@ -183,6 +278,7 @@ app.post('/api/start-session', async (req, res) => {
         turnCount: 0,
         responseTimes: [],
         socialCuesDetected: [],
+        emotionHistory: [],
         lastMessageTime: Date.now()
       }
     };
@@ -217,6 +313,15 @@ app.post('/api/conversation', async (req, res) => {
     // Analyze user's emotional tone
     const userEmotion = await analyzeEmotion(userMessage);
     
+    // Track emotion history
+    if (userEmotion && userEmotion[0]) {
+      session.stats.emotionHistory.push({
+        emotion: userEmotion[0].label,
+        score: userEmotion[0].score,
+        timestamp: Date.now()
+      });
+    }
+    
     const responseTime = (Date.now() - session.stats.lastMessageTime) / 1000;
     session.stats.responseTimes.push(responseTime);
     session.stats.lastMessageTime = Date.now();
@@ -228,8 +333,8 @@ app.post('/api/conversation', async (req, res) => {
     const aiSarcasm = await detectSarcasm(aiResponse);
     const isSarcastic = aiSarcasm && aiSarcasm[0]?.label === 'sarcasm' && aiSarcasm[0]?.score > 0.6;
     
-    // Generate personalized hints
-    const personalizedHints = generatePersonalizedHints(userEmotion, hints, isSarcastic);
+    // Generate highly personalized hints
+    const personalizedHints = generatePersonalizedHints(userEmotion, hints, isSarcastic, userMessage);
     
     socialCues.forEach(cue => {
       if (!session.stats.socialCuesDetected.includes(cue)) {
@@ -244,7 +349,12 @@ app.post('/api/conversation', async (req, res) => {
       socialCues,
       hints: personalizedHints,
       userEmotionFeedback: formatEmotionFeedback(userEmotion),
-      sarcasmWarning: isSarcastic ? "⚠️ This response may contain sarcasm or indirect communication" : null,
+      sarcasmWarning: isSarcastic ? {
+        detected: true,
+        message: "⚠️ INDIRECT COMMUNICATION DETECTED",
+        explanation: "The other person may be using sarcasm, irony, or saying the opposite of what they mean. Look for context clues!",
+        confidence: Math.round(aiSarcasm[0].score * 100)
+      } : null,
       stats: {
         turnCount: session.stats.turnCount,
         avgResponseTime: avgResponseTime.toFixed(1),
@@ -410,6 +520,15 @@ async function generateAnalytics(session) {
   const duration = (Date.now() - session.startTime) / 1000;
   const avgResponseTime = session.stats.responseTimes.reduce((a, b) => a + b, 0) / session.stats.responseTimes.length;
   
+  // Emotion pattern analysis
+  const emotionCounts = {};
+  session.stats.emotionHistory.forEach(e => {
+    emotionCounts[e.emotion] = (emotionCounts[e.emotion] || 0) + 1;
+  });
+  
+  const dominantEmotion = Object.entries(emotionCounts)
+    .sort((a, b) => b[1] - a[1])[0];
+  
   const transcript = session.conversationHistory
     .filter(msg => msg.role === 'user' || msg.role === 'assistant')
     .map(msg => {
@@ -424,6 +543,7 @@ async function generateAnalytics(session) {
 Scenario: ${session.config.context}
 Number of turns: ${session.stats.turnCount}
 Average response time: ${avgResponseTime.toFixed(1)}s
+Dominant emotion: ${dominantEmotion ? dominantEmotion[0] : 'neutral'}
 
 Conversation transcript:
 ${transcript}
@@ -436,6 +556,7 @@ Provide a JSON response with the following structure (respond ONLY with valid JS
   "clarityScore": 80,
   "engagementScore": 75,
   "appropriatenessScore": 75,
+  "emotionalRegulationScore": 70,
   "improvementTips": [
     "specific actionable tip 1",
     "specific actionable tip 2",
@@ -444,10 +565,14 @@ Provide a JSON response with the following structure (respond ONLY with valid JS
   "strengths": [
     "observed strength 1",
     "observed strength 2"
+  ],
+  "neurodivergentInsights": [
+    "specific insight about communication patterns",
+    "recognition of progress or challenges"
   ]
 }
 
-Evaluate based on: appropriate responses to social cues, empathy, clarity, engagement level, and contextual appropriateness.`
+Evaluate based on: appropriate responses to social cues, empathy, clarity, engagement level, emotional regulation, and contextual appropriateness.`
   }];
   
   try {
@@ -463,7 +588,12 @@ Evaluate based on: appropriate responses to social cues, empathy, clarity, engag
         totalTurns: session.stats.turnCount,
         avgResponseTime: avgResponseTime.toFixed(1),
         socialCuesDetected: session.stats.socialCuesDetected,
-        duration: Math.floor(duration)
+        duration: Math.floor(duration),
+        emotionPattern: dominantEmotion ? {
+          dominant: dominantEmotion[0],
+          occurrences: dominantEmotion[1],
+          distribution: emotionCounts
+        } : null
       };
     }
   } catch (e) {
@@ -478,16 +608,26 @@ Evaluate based on: appropriate responses to social cues, empathy, clarity, engag
     clarityScore: 80,
     engagementScore: 75,
     appropriatenessScore: 75,
+    emotionalRegulationScore: 70,
     improvementTips: [
       'Practice active listening by acknowledging what others say',
       'Work on response timing to maintain natural conversation flow',
       'Use more varied vocabulary to express emotions clearly'
     ],
     strengths: ['Good engagement', 'Appropriate tone'],
+    neurodivergentInsights: [
+      'You maintained focus throughout the conversation',
+      'Your responses showed clear thought patterns'
+    ],
     totalTurns: session.stats.turnCount,
     avgResponseTime: avgResponseTime.toFixed(1),
     socialCuesDetected: session.stats.socialCuesDetected,
-    duration: Math.floor(duration)
+    duration: Math.floor(duration),
+    emotionPattern: dominantEmotion ? {
+      dominant: dominantEmotion[0],
+      occurrences: dominantEmotion[1],
+      distribution: emotionCounts
+    } : null
   };
 }
 
