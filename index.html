@@ -1,0 +1,43 @@
+<!doctype html>
+<html>
+<head>
+<meta charset="utf-8" />
+<title>Speaking Practice (Local)</title>
+</head>
+<body>
+<h2>Record & Practice</h2>
+<button id="rec">Record 5s</button>
+<audio id="player" controls></audio>
+<pre id="result"></pre>
+
+
+<script>
+async function recordSeconds(sec=5){
+const stream = await navigator.mediaDevices.getUserMedia({audio:true});
+const mediaRecorder = new MediaRecorder(stream);
+const chunks = [];
+mediaRecorder.ondataavailable = e => chunks.push(e.data);
+mediaRecorder.start();
+await new Promise(r=>setTimeout(r, sec*1000));
+mediaRecorder.stop();
+await new Promise(r=>mediaRecorder.onstop = r);
+const blob = new Blob(chunks, {type:'audio/webm'});
+stream.getTracks().forEach(t=>t.stop());
+return blob;
+}
+
+
+document.getElementById('rec').onclick = async ()=>{
+const b = await recordSeconds(5);
+const fd = new FormData();
+fd.append('audio', b, 'sample.webm');
+const res = await fetch('/practice', { method:'POST', body: fd });
+const j = await res.json();
+document.getElementById('result').textContent = JSON.stringify(j, null, 2);
+if(j.audio_url){
+document.getElementById('player').src = j.audio_url;
+}
+}
+</script>
+</body>
+</html>
