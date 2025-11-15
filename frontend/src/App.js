@@ -118,52 +118,50 @@ export default function SocialPracticeSimulator() {
     }
   };
 
-  const handleUserMessage = useCallback(async (text) => {
+const handleUserMessage = useCallback(async (text) => {
   if (!text.trim() || isProcessing) return;
-  // ... rest of the function stays the same
-}, [sessionId, isProcessing, sensorySettings.muteAudio]);
+  
+  const userMessage = {
+    role: 'user',
+    content: text,
+    timestamp: Date.now()
+  };
+  
+  setMessages(prev => [...prev, userMessage]);
+  setIsProcessing(true);
+  
+  try {
+    const response = await fetch(`${API_URL}/api/conversation`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        sessionId,
+        userMessage: text
+      })
+    });
     
-    const userMessage = {
-      role: 'user',
-      content: text,
+    const data = await response.json();
+    
+    const aiMessage = {
+      role: 'ai',
+      content: data.aiResponse,
+      cues: data.socialCues || [],
+      hints: data.hints || [],
+      userEmotionFeedback: data.userEmotionFeedback || null,
+      sarcasmWarning: data.sarcasmWarning || null,
       timestamp: Date.now()
     };
     
-    setMessages(prev => [...prev, userMessage]);
-    setIsProcessing(true);
+    setMessages(prev => [...prev, aiMessage]);
+    setConversationStats(data.stats);
     
-    try {
-      const response = await fetch(`${API_URL}/api/conversation`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          sessionId,
-          userMessage: text
-        })
-      });
-      
-      const data = await response.json();
-      
-      const aiMessage = {
-        role: 'ai',
-        content: data.aiResponse,
-        cues: data.socialCues || [],
-        hints: data.hints || [],
-        userEmotionFeedback: data.userEmotionFeedback || null,
-        sarcasmWarning: data.sarcasmWarning || null,
-        timestamp: Date.now()
-      };
-      
-      setMessages(prev => [...prev, aiMessage]);
-      setConversationStats(data.stats);
-      
-      speakMessage(data.aiResponse);
-    } catch (error) {
-      console.error('Error in conversation:', error);
-    }
-    
-    setIsProcessing(false);
-  };
+    speakMessage(data.aiResponse);
+  } catch (error) {
+    console.error('Error in conversation:', error);
+  }
+  
+  setIsProcessing(false);
+}, [sessionId, isProcessing, sensorySettings.muteAudio]);
 
   const speakMessage = (text) => {
     if (sensorySettings.muteAudio) return;
