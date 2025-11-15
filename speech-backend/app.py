@@ -32,8 +32,9 @@ except Exception as e:
 app = Flask(__name__)
 
 # IMPORTANT: Add CORS to allow frontend to communicate
+# Replace the CORS configuration with this:
 CORS(app, 
-     resources={r"/*": {"origins": "*"}},  # Allow all origins for now
+     resources={r"/*": {"origins": "*"}},
      allow_headers=["Content-Type"],
      methods=["GET", "POST", "OPTIONS"]
 )
