@@ -5,6 +5,12 @@ const { v4: uuidv4 } = require('uuid');
 
 const app = express();
 const PORT = process.env.PORT || 10000;
+const express = require('express');
+const cors = require('cors');
+const { v4: uuidv4 } = require('uuid');
+const { HfInference } = require('@huggingface/inference'); // ADD THIS LINE
+
+const app = express();
 
 app.use(cors({
   origin: [
@@ -18,6 +24,83 @@ app.use(cors({
 app.use(express.json());
 
 const sessions = new Map();
+
+// Initialize Hugging Face
+const hf = new HfInference(process.env.HUGGING_FACE_API_KEY);
+
+// Emotion detection function
+async function analyzeEmotion(text) {
+  try {
+    const result = await hf.textClassification({
+      model: 'j-hartmann/emotion-english-distilroberta-base',
+      inputs: text
+    });
+    return result;
+  } catch (error) {
+    console.error('Emotion analysis error:', error);
+    return null;
+  }
+}
+
+// Detect sarcasm
+async function detectSarcasm(text) {
+  try {
+    const result = await hf.textClassification({
+      model: 'mrm8488/t5-base-finetuned-sarcasm-twitter',
+      inputs: text
+    });
+    return result;
+  } catch (error) {
+    console.error('Sarcasm detection error:', error);
+    return null;
+  }
+}
+
+// Helper functions
+function formatEmotionFeedback(emotions) {
+  if (!emotions || emotions.length === 0) return null;
+  
+  const topEmotion = emotions[0];
+  const emotionEmojis = {
+    joy: '😊',
+    sadness: '😢',
+    anger: '😠',
+    fear: '😰',
+    surprise: '😮',
+    neutral: '😐'
+  };
+  
+  return {
+    emotion: topEmotion.label,
+    confidence: (topEmotion.score * 100).toFixed(0) + '%',
+    emoji: emotionEmojis[topEmotion.label] || '🙂',
+    message: `Your tone seems ${topEmotion.label}`
+  };
+}
+
+function generatePersonalizedHints(emotion, baseHints, isSarcastic) {
+  const hints = [...baseHints];
+  
+  if (emotion && emotion.length > 0) {
+    const topEmotion = emotion[0].label;
+    
+    if (topEmotion === 'anger' || topEmotion === 'fear') {
+      hints.push("💙 Take a deep breath. It's okay to pause before responding.");
+    }
+    if (topEmotion === 'sadness') {
+      hints.push("💚 You're doing great. Remember this is practice in a safe space.");
+    }
+  }
+  
+  if (isSarcastic) {
+    hints.push("🔍 The other person may be using indirect language. Look for hidden meanings.");
+  }
+  
+  return hints;
+}
+
+const scenarioConfigs = {
+  // ... rest of your code
 
 const scenarioConfigs = {
   workplace_meeting: {
@@ -127,6 +210,9 @@ app.post('/api/conversation', async (req, res) => {
       return res.status(404).json({ error: 'Session not found' });
     }
     
+    // Analyze user's emotional tone
+    const userEmotion = await analyzeEmotion(userMessage);
+    
     const responseTime = (Date.now() - session.stats.lastMessageTime) / 1000;
     session.stats.responseTimes.push(responseTime);
     session.stats.lastMessageTime = Date.now();
@@ -134,14 +220,23 @@ app.post('/api/conversation', async (req, res) => {
     
     session.messages.push({
       role: 'user',
-      parts: [{ text: userMessage }]
+      parts: [{ text: userMessage }],
+      emotion: userEmotion
     });
     
     const { aiResponse, socialCues, hints } = await generateAIResponse(session, userMessage);
     
+    // Detect sarcasm or ambiguity in AI response
+    const aiSarcasm = await detectSarcasm(aiResponse);
+    const isSarcastic = aiSarcasm && aiSarcasm[0]?.label === 'sarcasm' && aiSarcasm[0]?.score > 0.6;
+    
+    // Generate personalized hints
+    const personalizedHints = generatePersonalizedHints(userEmotion, hints, isSarcastic);
+    
     session.messages.push({
       role: 'model',
-      parts: [{ text: aiResponse }]
+      parts: [{ text: aiResponse }],
+      sarcasmDetected: isSarcastic
     });
     
     socialCues.forEach(cue => {
@@ -155,7 +250,9 @@ app.post('/api/conversation', async (req, res) => {
     res.json({
       aiResponse,
       socialCues,
-      hints,
+      hints: personalizedHints,
+      userEmotionFeedback: formatEmotionFeedback(userEmotion),
+      sarcasmWarning: isSarcastic ? "⚠️ This response may contain sarcasm or indirect communication" : null,
       stats: {
         turnCount: session.stats.turnCount,
         avgResponseTime: avgResponseTime.toFixed(1),
@@ -166,12 +263,10 @@ app.post('/api/conversation', async (req, res) => {
     console.error('❌ Error in conversation:', error.message);
     res.status(500).json({ 
       error: 'Failed to process message', 
-      details: error.message,
-      hint: 'Check if GOOGLE_API_KEY is set in environment variables'
+      details: error.message
     });
   }
 });
-
 app.post('/api/end-session', async (req, res) => {
   try {
     const { sessionId } = req.body;
