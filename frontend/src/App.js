@@ -409,6 +409,7 @@ const renderScenarioSelection = () => (
     </div>
   );
 }
+);  // Closes renderScenarioSelection
 
   const renderResults = () => (
     <div className="min-h-screen bg-gradient-to-br from-indigo-50 to-purple-100 p-8">
