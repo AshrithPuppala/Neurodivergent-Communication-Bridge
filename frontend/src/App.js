@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { Mic, MicOff, MessageSquare, BarChart3, TrendingUp } from 'lucide-react';
 
 const API_URL = 'https://neurodivergent-communication-bridge-4neh.onrender.com';
@@ -118,8 +118,10 @@ export default function SocialPracticeSimulator() {
     }
   };
 
-  const handleUserMessage = async (text) => {
-    if (!text.trim() || isProcessing) return;
+  const handleUserMessage = useCallback(async (text) => {
+  if (!text.trim() || isProcessing) return;
+  // ... rest of the function stays the same
+}, [sessionId, isProcessing, sensorySettings.muteAudio]);
     
     const userMessage = {
       role: 'user',
@@ -254,8 +256,7 @@ export default function SocialPracticeSimulator() {
         <div className="max-w-4xl mx-auto flex items-center justify-between">
           <div>
             <h2 className="text-2xl font-bold text-gray-800">{selectedScenario?.name}</h2>
-            <p className="text-sm text-gray-600">Turn {conversationStats.turnCount} • Practice Session</p>
-          </div>
+           <p className="text-sm text-gray-600">Turn {conversationStats?.turnCount || 0} • Practice Session</p>
           
           <div className="flex gap-3">
             <button
