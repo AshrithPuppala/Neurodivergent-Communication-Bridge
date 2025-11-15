@@ -12,7 +12,7 @@
     "cors": "^2.8.5",
     "uuid": "^9.0.0",
     "dotenv": "^16.3.1",
-    "@huggingface/inference": "^2.6.4"
+    "@huggingface/inference": "^2.8.0"
   },
   "devDependencies": {
     "nodemon": "^3.0.1"
