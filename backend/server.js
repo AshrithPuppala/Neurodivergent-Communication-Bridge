@@ -15,6 +15,8 @@ app.use(cors({
 }));
 app.use(express.json());
 
+app.use(express.json());
+
 const sessions = new Map();
 
 const scenarioConfigs = {
