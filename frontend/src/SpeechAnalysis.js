@@ -29,8 +29,10 @@ export default function SpeechAnalysis({ onBack }) {
     formData.append('audio_file', selectedFile);
 
     try {
-      // Replace with your actual Python Flask backend URL on Render
-      const response = await fetch('https://neurodivergent-speech-backend.onrender.com/analyze_conversation', {
+      // TODO: Replace with your actual Python Flask backend URL on Render after deployment
+      const PYTHON_BACKEND_URL = 'https://YOUR-PYTHON-BACKEND-NAME.onrender.com';
+      
+      const response = await fetch(`${PYTHON_BACKEND_URL}/analyze_conversation`, {
         method: 'POST',
         body: formData,
       });
@@ -57,7 +59,7 @@ export default function SpeechAnalysis({ onBack }) {
           className="flex items-center gap-2 text-gray-600 hover:text-gray-800 mb-6 transition-colors"
         >
           <ArrowLeft size={20} />
-          Back to Home
+          <span className="font-medium">Back to Home</span>
         </button>
 
         <div className="bg-white rounded-2xl shadow-xl p-8">
