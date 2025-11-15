@@ -38,17 +38,14 @@ export default function SocialPracticeSimulator() {
   const recognitionRef = useRef(null);
   const messagesEndRef = useRef(null);
 
- useEffect(() => {
-  // eslint-disable-next-line no-undef
-  if ('webkitSpeechRecognition' in window) {
-    // eslint-disable-next-line no-undef
-    const SpeechRecognition = window.webkitSpeechRecognition;
-    const recognition = new SpeechRecognition();
-    recognition.continuous = true;
-    recognition.interimResults = true;
-    
-    recognition.onresult = (event) => {
-      // ... rest of code
+  useEffect(() => {
+    if ('webkitSpeechRecognition' in window) {
+      const SpeechRecognition = window.webkitSpeechRecognition;
+      const recognition = new SpeechRecognition();
+      recognition.continuous = true;
+      recognition.interimResults = true;
+      
+      recognition.onresult = (event) => {
         let interim = '';
         let final = '';
         
@@ -102,7 +99,6 @@ export default function SocialPracticeSimulator() {
       }]);
       setView('conversation');
       
-      // Speak the initial message
       speakMessage(data.initialMessage);
     } catch (error) {
       console.error('Error starting session:', error);
@@ -147,19 +143,18 @@ export default function SocialPracticeSimulator() {
       const data = await response.json();
       
       const aiMessage = {
-      role: 'ai',
-      content: data.aiResponse,
-      cues: data.socialCues || [],
-      hints: data.hints || [],
-      userEmotionFeedback: data.userEmotionFeedback || null,
-      sarcasmWarning: data.sarcasmWarning || null,
-      timestamp: Date.now()
-    };
+        role: 'ai',
+        content: data.aiResponse,
+        cues: data.socialCues || [],
+        hints: data.hints || [],
+        userEmotionFeedback: data.userEmotionFeedback || null,
+        sarcasmWarning: data.sarcasmWarning || null,
+        timestamp: Date.now()
+      };
       
       setMessages(prev => [...prev, aiMessage]);
       setConversationStats(data.stats);
       
-      // Speak AI response
       speakMessage(data.aiResponse);
     } catch (error) {
       console.error('Error in conversation:', error);
@@ -168,14 +163,14 @@ export default function SocialPracticeSimulator() {
     setIsProcessing(false);
   };
 
-const speakMessage = (text) => {
-  if (sensorySettings.muteAudio) return; // Don't speak if muted
-  
-  const utterance = new SpeechSynthesisUtterance(text);
-  utterance.rate = 0.9; // Slightly slower for clarity
-  utterance.pitch = 1;
-  window.speechSynthesis.speak(utterance);
-};
+  const speakMessage = (text) => {
+    if (sensorySettings.muteAudio) return;
+    
+    const utterance = new SpeechSynthesisUtterance(text);
+    utterance.rate = 0.9;
+    utterance.pitch = 1;
+    window.speechSynthesis.speak(utterance);
+  };
 
   const endSession = async () => {
     setIsProcessing(true);
@@ -203,55 +198,55 @@ const speakMessage = (text) => {
   };
 
   const renderSensoryControls = () => (
-  <div className="bg-white rounded-lg shadow p-4 mb-4">
-    <h3 className="font-bold text-sm text-gray-700 mb-3">🎨 Comfort Settings</h3>
-    
-    <div className="space-y-2">
-      <label className="flex items-center gap-2 cursor-pointer text-sm">
-        <input 
-          type="checkbox" 
-          checked={sensorySettings.reducedMotion}
-          onChange={(e) => setSensorySettings({...sensorySettings, reducedMotion: e.target.checked})}
-          className="rounded"
-        />
-        <span>Reduce animations</span>
-      </label>
+    <div className="bg-white rounded-lg shadow p-4 mb-4">
+      <h3 className="font-bold text-sm text-gray-700 mb-3">🎨 Comfort Settings</h3>
       
-      <label className="flex items-center gap-2 cursor-pointer text-sm">
-        <input 
-          type="checkbox" 
-          checked={sensorySettings.muteAudio}
-          onChange={(e) => setSensorySettings({...sensorySettings, muteAudio: e.target.checked})}
-          className="rounded"
-        />
-        <span>Mute AI voice</span>
-      </label>
-      
-      <label className="flex items-center gap-2 cursor-pointer text-sm">
-        <input 
-          type="checkbox" 
-          checked={sensorySettings.simplifiedUI}
-          onChange={(e) => setSensorySettings({...sensorySettings, simplifiedUI: e.target.checked})}
-          className="rounded"
-        />
-        <span>Simplified view</span>
-      </label>
-      
-      <div>
-        <label className="text-sm text-gray-700 block mb-1">Text Size</label>
-        <select 
-          value={sensorySettings.fontSize}
-          onChange={(e) => setSensorySettings({...sensorySettings, fontSize: e.target.value})}
-          className="w-full rounded border p-1 text-sm"
-        >
-          <option value="normal">Normal</option>
-          <option value="large">Large</option>
-          <option value="xlarge">Extra Large</option>
-        </select>
+      <div className="space-y-2">
+        <label className="flex items-center gap-2 cursor-pointer text-sm">
+          <input 
+            type="checkbox" 
+            checked={sensorySettings.reducedMotion}
+            onChange={(e) => setSensorySettings({...sensorySettings, reducedMotion: e.target.checked})}
+            className="rounded"
+          />
+          <span>Reduce animations</span>
+        </label>
+        
+        <label className="flex items-center gap-2 cursor-pointer text-sm">
+          <input 
+            type="checkbox" 
+            checked={sensorySettings.muteAudio}
+            onChange={(e) => setSensorySettings({...sensorySettings, muteAudio: e.target.checked})}
+            className="rounded"
+          />
+          <span>Mute AI voice</span>
+        </label>
+        
+        <label className="flex items-center gap-2 cursor-pointer text-sm">
+          <input 
+            type="checkbox" 
+            checked={sensorySettings.simplifiedUI}
+            onChange={(e) => setSensorySettings({...sensorySettings, simplifiedUI: e.target.checked})}
+            className="rounded"
+          />
+          <span>Simplified view</span>
+        </label>
+        
+        <div>
+          <label className="text-sm text-gray-700 block mb-1">Text Size</label>
+          <select 
+            value={sensorySettings.fontSize}
+            onChange={(e) => setSensorySettings({...sensorySettings, fontSize: e.target.value})}
+            className="w-full rounded border p-1 text-sm"
+          >
+            <option value="normal">Normal</option>
+            <option value="large">Large</option>
+            <option value="xlarge">Extra Large</option>
+          </select>
+        </div>
       </div>
     </div>
-  </div>
-);
+  );
 
   const renderConversation = () => (
     <div className="min-h-screen bg-gray-50 flex flex-col">
@@ -283,10 +278,35 @@ const speakMessage = (text) => {
       
       <div className="flex-1 overflow-y-auto p-4">
         <div className="max-w-4xl mx-auto space-y-4">
+          {renderSensoryControls()}
+          
           {messages.map((msg, idx) => (
             <div key={idx} className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}>
-              <div className={`max-w-2xl ${msg.role === 'user' ? 'bg-indigo-600 text-white' : 'bg-white'} rounded-2xl p-4 shadow-sm`}>
+              <div className={`max-w-2xl ${msg.role === 'user' ? 'bg-indigo-600 text-white' : 'bg-white'} rounded-2xl p-4 shadow-sm ${
+                sensorySettings.fontSize === 'large' ? 'text-lg' : 
+                sensorySettings.fontSize === 'xlarge' ? 'text-xl' : 
+                'text-base'
+              }`}>
                 <p className={msg.role === 'user' ? 'text-white' : 'text-gray-800'}>{msg.content}</p>
+                
+                {msg.role === 'ai' && msg.userEmotionFeedback && (
+                  <div className="mt-3 pt-3 border-t border-gray-200">
+                    <p className="text-xs font-semibold text-purple-600 mb-2">
+                      📊 Your Communication Analysis
+                    </p>
+                    <div className="bg-purple-50 rounded p-2 text-xs">
+                      <span className="text-2xl">{msg.userEmotionFeedback.emoji}</span>
+                      <span className="ml-2">{msg.userEmotionFeedback.message}</span>
+                      <span className="ml-2 text-purple-700">({msg.userEmotionFeedback.confidence})</span>
+                    </div>
+                  </div>
+                )}
+                
+                {msg.role === 'ai' && msg.sarcasmWarning && (
+                  <div className="mt-2 bg-yellow-50 border border-yellow-200 rounded p-2">
+                    <p className="text-xs text-yellow-800">{msg.sarcasmWarning}</p>
+                  </div>
+                )}
                 
                 {msg.role === 'ai' && msg.cues && msg.cues.length > 0 && (
                   <div className="mt-3 pt-3 border-t border-gray-200">
@@ -360,7 +380,8 @@ const speakMessage = (text) => {
       </div>
     </div>
   );
-const renderScenarioSelection = () => (
+
+  const renderScenarioSelection = () => (
     <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 p-8">
       <div className="max-w-6xl mx-auto">
         <div className="text-center mb-12">
@@ -399,17 +420,6 @@ const renderScenarioSelection = () => (
       </div>
     </div>
   );
-
-  // Main return at the very end (around line 506)
-  return (
-    <div>
-      {view === 'selection' && renderScenarioSelection()}
-      {view === 'conversation' && renderConversation()}
-      {view === 'results' && renderResults()}
-    </div>
-  );
-}
-);  // Closes renderScenarioSelection
 
   const renderResults = () => (
     <div className="min-h-screen bg-gradient-to-br from-indigo-50 to-purple-100 p-8">
