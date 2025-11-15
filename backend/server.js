@@ -18,13 +18,11 @@ app.use(cors({
 app.use(express.json());
 
 const sessions = new Map();
+
+// Initialize Hugging Face - FIXED SYNTAX
 const hf = new HfInference(process.env.HUGGING_FACE_API_KEY);
 
-// All helper functions here...
-// Make sure each function has proper closing braces
-
-const scenarioConfigs = {
-  // ... your scenarios
+// Emotion detection function
 async function analyzeEmotion(text) {
   try {
     const result = await hf.textClassification({
@@ -74,7 +72,6 @@ function formatEmotionFeedback(emotions) {
   };
 }
 
-// After the last helper function (generatePersonalizedHints)
 function generatePersonalizedHints(emotion, baseHints, isSarcastic) {
   const hints = [...baseHints];
   
@@ -94,10 +91,7 @@ function generatePersonalizedHints(emotion, baseHints, isSarcastic) {
   }
   
   return hints;
-}  // ← Make sure this closing brace exists!
-
-const scenarioConfigs = {  // ← This should come AFTER all functions
-  workplace_meeting: {
+}
 
 const scenarioConfigs = {
   workplace_meeting: {
@@ -150,6 +144,9 @@ app.get('/', (req, res) => {
 app.get('/api/health', (req, res) => {
   res.json({ status: 'ok', activeConnections: sessions.size });
 });
+
+// ... rest of your endpoints (start-session, conversation, end-session)
+// Keep everything else as is, just fix the top section
 
 app.post('/api/start-session', async (req, res) => {
   try {
