@@ -1,4 +1,3 @@
-// server.js - Backend with Google Gemini API (FREE)
 const express = require('express');
 const cors = require('cors');
 const { v4: uuidv4 } = require('uuid');
@@ -18,9 +17,14 @@ app.use(cors({
 }));
 app.use(express.json());
 
-// Initialize Hugging Face
+const sessions = new Map();
 const hf = new HfInference(process.env.HUGGING_FACE_API_KEY);
-// Emotion detection function
+
+// All helper functions here...
+// Make sure each function has proper closing braces
+
+const scenarioConfigs = {
+  // ... your scenarios
 async function analyzeEmotion(text) {
   try {
     const result = await hf.textClassification({
