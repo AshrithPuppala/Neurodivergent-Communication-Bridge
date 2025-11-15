@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Mic, MicOff, MessageSquare, BarChart3, Settings, Play, Pause, TrendingUp } from 'lucide-react';
-const API_URL = 'https://neurodivergent-communication-bridge-4neh.onrender.com';// Replace with your Render backend URL
+import { Mic, MicOff, MessageSquare, BarChart3, TrendingUp } from 'lucide-react';
+
+const API_URL = 'https://neurodivergent-communication-bridge-4neh.onrender.com';
 
 const scenarios = [
   { id: 'workplace_meeting', name: 'Team Meeting', context: 'workplace', difficulty: 'medium', description: 'Participate in a team standup meeting' },
@@ -22,20 +23,20 @@ export default function SocialPracticeSimulator() {
   const [showHints, setShowHints] = useState(false);
   const [analytics, setAnalytics] = useState(null);
   const [conversationStats, setConversationStats] = useState({
-  turnCount: 0,
-  avgResponseTime: 0,
-  socialCuesDetected: []
-});
-
-const [sensorySettings, setSensorySettings] = useState({
-  reducedMotion: false,
-  muteAudio: false,
-  simplifiedUI: false,
-  fontSize: 'normal'
-});
-
-const recognitionRef = useRef(null);
-const messagesEndRef = useRef(null);
+    turnCount: 0,
+    avgResponseTime: 0,
+    socialCuesDetected: []
+  });
+  
+  const [sensorySettings, setSensorySettings] = useState({
+    reducedMotion: false,
+    muteAudio: false,
+    simplifiedUI: false,
+    fontSize: 'normal'
+  });
+  
+  const recognitionRef = useRef(null);
+  const messagesEndRef = useRef(null);
 
  useEffect(() => {
   // eslint-disable-next-line no-undef
