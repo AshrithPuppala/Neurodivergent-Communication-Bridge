@@ -1,6 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { Mic, MicOff, MessageSquare, BarChart3, Settings, Play, Pause, TrendingUp } from 'lucide-react';
-
 const API_URL = 'https://neurodivergent-communication-bridge-4neh.onrender.com';// Replace with your Render backend URL
 
 const scenarios = [
@@ -13,7 +12,7 @@ const scenarios = [
 ];
 
 export default function SocialPracticeSimulator() {
-  const [view, setView] = useState('selection'); // selection, conversation, results
+  const [view, setView] = useState('selection');
   const [selectedScenario, setSelectedScenario] = useState(null);
   const [sessionId, setSessionId] = useState(null);
   const [messages, setMessages] = useState([]);
@@ -27,6 +26,17 @@ export default function SocialPracticeSimulator() {
     avgResponseTime: 0,
     socialCuesDetected: []
   });
+  
+  // ADD THESE NEW STATE VARIABLES:
+  const [sensorySettings, setSensorySettings] = useState({
+    reducedMotion: false,
+    muteAudio: false,
+    simplifiedUI: false,
+    fontSize: 'normal'
+  });
+  
+  const recognitionRef = useRef(null);
+  const messagesEndRef = useRef(null);
   
   const recognitionRef = useRef(null);
   const messagesEndRef = useRef(null);
@@ -140,12 +150,14 @@ export default function SocialPracticeSimulator() {
       const data = await response.json();
       
       const aiMessage = {
-        role: 'ai',
-        content: data.aiResponse,
-        cues: data.socialCues || [],
-        hints: data.hints || [],
-        timestamp: Date.now()
-      };
+      role: 'ai',
+      content: data.aiResponse,
+      cues: data.socialCues || [],
+      hints: data.hints || [],
+      userEmotionFeedback: data.userEmotionFeedback || null,
+      sarcasmWarning: data.sarcasmWarning || null,
+      timestamp: Date.now()
+    };
       
       setMessages(prev => [...prev, aiMessage]);
       setConversationStats(data.stats);
@@ -159,12 +171,14 @@ export default function SocialPracticeSimulator() {
     setIsProcessing(false);
   };
 
-  const speakMessage = (text) => {
-    const utterance = new SpeechSynthesisUtterance(text);
-    utterance.rate = 0.95;
-    utterance.pitch = 1;
-    window.speechSynthesis.speak(utterance);
-  };
+const speakMessage = (text) => {
+  if (sensorySettings.muteAudio) return; // Don't speak if muted
+  
+  const utterance = new SpeechSynthesisUtterance(text);
+  utterance.rate = 0.9; // Slightly slower for clarity
+  utterance.pitch = 1;
+  window.speechSynthesis.speak(utterance);
+};
 
   const endSession = async () => {
     setIsProcessing(true);
@@ -191,45 +205,56 @@ export default function SocialPracticeSimulator() {
     }
   };
 
-  const renderScenarioSelection = () => (
-    <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 p-8">
-      <div className="max-w-6xl mx-auto">
-        <div className="text-center mb-12">
-          <h1 className="text-5xl font-bold text-gray-800 mb-4">Social Practice Simulator</h1>
-          <p className="text-xl text-gray-600">Build confidence through realistic AI-powered conversations</p>
-        </div>
-        
-        <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
-          {scenarios.map(scenario => (
-            <div key={scenario.id} className="bg-white rounded-xl shadow-lg p-6 hover:shadow-xl transition-shadow cursor-pointer" onClick={() => startConversation(scenario)}>
-              <div className="flex items-start justify-between mb-4">
-                <div className="bg-indigo-100 p-3 rounded-lg">
-                  <MessageSquare className="text-indigo-600" size={24} />
-                </div>
-                <span className={`px-3 py-1 rounded-full text-sm font-medium ${
-                  scenario.difficulty === 'easy' ? 'bg-green-100 text-green-700' :
-                  scenario.difficulty === 'medium' ? 'bg-yellow-100 text-yellow-700' :
-                  'bg-red-100 text-red-700'
-                }`}>
-                  {scenario.difficulty}
-                </span>
-              </div>
-              
-              <h3 className="text-xl font-bold text-gray-800 mb-2">{scenario.name}</h3>
-              <p className="text-gray-600 mb-4">{scenario.description}</p>
-              
-              <div className="flex items-center justify-between">
-                <span className="text-sm text-gray-500 capitalize">{scenario.context}</span>
-                <button className="bg-indigo-600 text-white px-4 py-2 rounded-lg hover:bg-indigo-700 transition-colors">
-                  Start
-                </button>
-              </div>
-            </div>
-          ))}
-        </div>
+  const renderSensoryControls = () => (
+  <div className="bg-white rounded-lg shadow p-4 mb-4">
+    <h3 className="font-bold text-sm text-gray-700 mb-3">🎨 Comfort Settings</h3>
+    
+    <div className="space-y-2">
+      <label className="flex items-center gap-2 cursor-pointer text-sm">
+        <input 
+          type="checkbox" 
+          checked={sensorySettings.reducedMotion}
+          onChange={(e) => setSensorySettings({...sensorySettings, reducedMotion: e.target.checked})}
+          className="rounded"
+        />
+        <span>Reduce animations</span>
+      </label>
+      
+      <label className="flex items-center gap-2 cursor-pointer text-sm">
+        <input 
+          type="checkbox" 
+          checked={sensorySettings.muteAudio}
+          onChange={(e) => setSensorySettings({...sensorySettings, muteAudio: e.target.checked})}
+          className="rounded"
+        />
+        <span>Mute AI voice</span>
+      </label>
+      
+      <label className="flex items-center gap-2 cursor-pointer text-sm">
+        <input 
+          type="checkbox" 
+          checked={sensorySettings.simplifiedUI}
+          onChange={(e) => setSensorySettings({...sensorySettings, simplifiedUI: e.target.checked})}
+          className="rounded"
+        />
+        <span>Simplified view</span>
+      </label>
+      
+      <div>
+        <label className="text-sm text-gray-700 block mb-1">Text Size</label>
+        <select 
+          value={sensorySettings.fontSize}
+          onChange={(e) => setSensorySettings({...sensorySettings, fontSize: e.target.value})}
+          className="w-full rounded border p-1 text-sm"
+        >
+          <option value="normal">Normal</option>
+          <option value="large">Large</option>
+          <option value="xlarge">Extra Large</option>
+        </select>
       </div>
     </div>
-  );
+  </div>
+);
 
   const renderConversation = () => (
     <div className="min-h-screen bg-gray-50 flex flex-col">
