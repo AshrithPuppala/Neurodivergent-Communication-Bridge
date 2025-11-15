@@ -13,7 +13,7 @@ import assemblyai as aai
 # --- Google Gemini Client (for LLM Analysis) ---
 try:
     genai.configure() 
-    gemini_model = genai.GenerativeModel('gemini-2.0-flash')
+    gemini_model = genai.GenerativeModel('gemini-1.5-flash')
     print("Gemini client initialized successfully.")
 except Exception as e:
     print(f"Error initializing Google Gemini client: {e}")
@@ -32,11 +32,11 @@ except Exception as e:
 app = Flask(__name__)
 
 # IMPORTANT: Add CORS to allow frontend to communicate
-CORS(app, origins=[
-    'https://neurodivergent-communication-bridge-5pfw.onrender.com',  # Your frontend URL
-    'http://localhost:3000',  # For local development
-    'http://localhost:5000'
-])
+CORS(app, 
+     resources={r"/*": {"origins": "*"}},  # Allow all origins for now
+     allow_headers=["Content-Type"],
+     methods=["GET", "POST", "OPTIONS"]
+)
 
 UPLOAD_FOLDER = 'uploads'
 if not os.path.exists(UPLOAD_FOLDER):
