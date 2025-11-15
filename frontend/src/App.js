@@ -199,10 +199,9 @@ export default function SocialPracticeSimulator() {
   };
 
   const renderSensoryControls = () => (
-    <div className="bg-white rounded-lg shadow p-4 mb-4">
-      <h3 className="font-bold text-sm text-gray-700 mb-3">🎨 Comfort Settings</h3>
-      
-      <div className="space-y-2">
+  <div className="bg-white rounded-lg shadow p-4 mb-4">
+    <h3 className="font-bold text-sm text-gray-700 mb-3">🎨 Comfort Settings</h3>
+    <div className="space-y-2">
         <label className="flex items-center gap-2 cursor-pointer text-sm">
           <input 
             type="checkbox" 
@@ -230,7 +229,7 @@ export default function SocialPracticeSimulator() {
             onChange={(e) => setSensorySettings({...sensorySettings, simplifiedUI: e.target.checked})}
             className="rounded"
           />
-          <span>Simplified view</span>
+          <span>Simplified view (less info)</span>
         </label>
         
         <div>
@@ -248,6 +247,46 @@ export default function SocialPracticeSimulator() {
       </div>
     </div>
   );
+
+  const renderSensoryOverloadWarning = () => {
+    const messageCount = messages.length;
+    const recentMessages = messages.slice(-5);
+    const hasComplexFeedback = recentMessages.some(m => 
+      m.userEmotionFeedback || m.sarcasmWarning || (m.hints && m.hints.length > 3)
+    );
+    
+    const shouldWarn = messageCount > 10 && hasComplexFeedback;
+    
+    if (!shouldWarn) return null;
+    
+    return (
+      <div className="bg-orange-50 border-2 border-orange-300 rounded-lg p-4 mb-4">
+        <div className="flex items-start gap-3">
+          <span className="text-2xl">🧘</span>
+          <div className="flex-1">
+            <p className="font-bold text-orange-900 mb-2">⚡ Sensory Check-In</p>
+            <p className="text-sm text-orange-800 mb-3">
+              You've been practicing for a while with lots of information. It's okay to take a break!
+            </p>
+            <div className="space-y-2">
+              <button
+                onClick={() => setSensorySettings({...sensorySettings, simplifiedUI: true})}
+                className="w-full bg-white border border-orange-300 text-orange-900 px-3 py-2 rounded text-sm hover:bg-orange-100 transition-colors"
+              >
+                🎨 Switch to Simplified View
+              </button>
+              <button
+                onClick={endSession}
+                className="w-full bg-orange-600 text-white px-3 py-2 rounded text-sm hover:bg-orange-700 transition-colors"
+              >
+                ⏸️ Take a Break (End Session)
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  };
 
   const renderConversation = () => (
     <div className="min-h-screen bg-gray-50 flex flex-col">
@@ -280,6 +319,7 @@ export default function SocialPracticeSimulator() {
       <div className="flex-1 overflow-y-auto p-4">
         <div className="max-w-4xl mx-auto space-y-4">
           {renderSensoryControls()}
+          {renderSensoryOverloadWarning()}
           
           {messages.map((msg, idx) => (
             <div key={idx} className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}>
@@ -290,47 +330,116 @@ export default function SocialPracticeSimulator() {
               }`}>
                 <p className={msg.role === 'user' ? 'text-white' : 'text-gray-800'}>{msg.content}</p>
                 
-                {msg.role === 'ai' && msg.userEmotionFeedback && (
-                  <div className="mt-3 pt-3 border-t border-gray-200">
-                    <p className="text-xs font-semibold text-purple-600 mb-2">
-                      📊 Your Communication Analysis
-                    </p>
-                    <div className="bg-purple-50 rounded p-2 text-xs">
-                      <span className="text-2xl">{msg.userEmotionFeedback.emoji}</span>
-                      <span className="ml-2">{msg.userEmotionFeedback.message}</span>
-                      <span className="ml-2 text-purple-700">({msg.userEmotionFeedback.confidence})</span>
-                    </div>
-                  </div>
-                )}
-                
-                {msg.role === 'ai' && msg.sarcasmWarning && (
-                  <div className="mt-2 bg-yellow-50 border border-yellow-200 rounded p-2">
-                    <p className="text-xs text-yellow-800">{msg.sarcasmWarning}</p>
-                  </div>
-                )}
-                
-                {msg.role === 'ai' && msg.cues && msg.cues.length > 0 && (
-                  <div className="mt-3 pt-3 border-t border-gray-200">
-                    <p className="text-xs font-semibold text-gray-500 mb-2">Social Cues Detected:</p>
-                    <div className="flex flex-wrap gap-2">
-                      {msg.cues.map((cue, i) => (
-                        <span key={i} className="text-xs bg-blue-50 text-blue-700 px-2 py-1 rounded">
-                          {cue}
-                        </span>
-                      ))}
-                    </div>
-                  </div>
-                )}
-                
-                {showHints && msg.hints && msg.hints.length > 0 && (
-                  <div className="mt-3 pt-3 border-t border-gray-200">
-                    <p className="text-xs font-semibold text-indigo-600 mb-2">💡 Hints:</p>
-                    <ul className="text-xs text-gray-600 space-y-1">
-                      {msg.hints.map((hint, i) => (
-                        <li key={i}>• {hint}</li>
-                      ))}
-                    </ul>
-                  </div>
+                {!sensorySettings.simplifiedUI && (
+                  <>
+                    {msg.role === 'ai' && msg.userEmotionFeedback && (
+                      <div className="mt-3 pt-3 border-t border-gray-200">
+                        <p className="text-xs font-semibold text-purple-600 mb-2">
+                          📊 Your Communication Analysis
+                        </p>
+                        <div className="bg-purple-50 rounded p-3 space-y-2">
+                          <div className="flex items-center gap-2">
+                            <span className="text-3xl">{msg.userEmotionFeedback.emoji}</span>
+                            <div className="flex-1">
+                              <p className="text-sm font-bold text-purple-900 capitalize">{msg.userEmotionFeedback.emotion}</p>
+                              <p className="text-xs text-purple-700">Confidence: {msg.userEmotionFeedback.confidence}%</p>
+                            </div>
+                          </div>
+                          
+                          {msg.userEmotionFeedback.description && (
+                            <div className="bg-white rounded p-2">
+                              <p className="text-xs text-gray-700"><strong>What this means:</strong> {msg.userEmotionFeedback.description}</p>
+                            </div>
+                          )}
+                          
+                          {msg.userEmotionFeedback.tip && (
+                            <div className="bg-indigo-50 rounded p-2">
+                              <p className="text-xs text-indigo-800"><strong>💡 Tip:</strong> {msg.userEmotionFeedback.tip}</p>
+                            </div>
+                          )}
+                          
+                          {msg.userEmotionFeedback.impact && (
+                            <div className="bg-blue-50 rounded p-2">
+                              <p className="text-xs text-blue-800"><strong>🎯 Impact:</strong> {msg.userEmotionFeedback.impact}</p>
+                            </div>
+                          )}
+                          
+                          {msg.userEmotionFeedback.allEmotions && msg.userEmotionFeedback.allEmotions.length > 1 && (
+                            <div className="border-t border-purple-200 pt-2">
+                              <p className="text-xs text-purple-600 font-semibold mb-1">Emotion Breakdown:</p>
+                              <div className="space-y-1">
+                                {msg.userEmotionFeedback.allEmotions.map((e, i) => (
+                                  <div key={i} className="flex items-center gap-2">
+                                    <div className="flex-1 bg-gray-200 rounded-full h-2">
+                                      <div 
+                                        className="bg-purple-500 h-2 rounded-full transition-all"
+                                        style={{width: `${e.percentage}%`}}
+                                      ></div>
+                                    </div>
+                                    <span className="text-xs text-gray-600 w-16 capitalize">{e.label}</span>
+                                    <span className="text-xs text-gray-500 w-8">{e.percentage}%</span>
+                                  </div>
+                                ))}
+                              </div>
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    )}
+                    
+                    {msg.role === 'ai' && msg.sarcasmWarning && (
+                      <div className="mt-3 bg-yellow-50 border-2 border-yellow-300 rounded-lg p-3 space-y-2">
+                        <div className="flex items-start gap-2">
+                          <span className="text-2xl">⚠️</span>
+                          <div className="flex-1">
+                            <p className="text-sm font-bold text-yellow-900">{msg.sarcasmWarning.message || '⚠️ Sarcasm Detected'}</p>
+                            {msg.sarcasmWarning.confidence && (
+                              <p className="text-xs text-yellow-700">Confidence: {msg.sarcasmWarning.confidence}%</p>
+                            )}
+                          </div>
+                        </div>
+                        
+                        {msg.sarcasmWarning.explanation && (
+                          <div className="bg-yellow-100 rounded p-2">
+                            <p className="text-xs text-yellow-900">{msg.sarcasmWarning.explanation}</p>
+                          </div>
+                        )}
+                        
+                        <div className="bg-white rounded p-2 border border-yellow-200">
+                          <p className="text-xs text-gray-800 font-semibold mb-1">🔍 What to do:</p>
+                          <ul className="text-xs text-gray-700 space-y-1 ml-4 list-disc">
+                            <li>Listen for tone that doesn't match the words</li>
+                            <li>Look for exaggeration or obvious contradictions</li>
+                            <li>It's okay to ask: "Are you being serious or joking?"</li>
+                          </ul>
+                        </div>
+                      </div>
+                    )}
+                    
+                    {msg.role === 'ai' && msg.cues && msg.cues.length > 0 && (
+                      <div className="mt-3 pt-3 border-t border-gray-200">
+                        <p className="text-xs font-semibold text-gray-500 mb-2">Social Cues Detected:</p>
+                        <div className="flex flex-wrap gap-2">
+                          {msg.cues.map((cue, i) => (
+                            <span key={i} className="text-xs bg-blue-50 text-blue-700 px-2 py-1 rounded">
+                              {cue}
+                            </span>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+                    
+                    {showHints && msg.hints && msg.hints.length > 0 && (
+                      <div className="mt-3 pt-3 border-t border-gray-200">
+                        <p className="text-xs font-semibold text-indigo-600 mb-2">💡 Hints:</p>
+                        <ul className="text-xs text-gray-600 space-y-1">
+                          {msg.hints.map((hint, i) => (
+                            <li key={i}>• {hint}</li>
+                          ))}
+                        </ul>
+                      </div>
+                    )}
+                  </>
                 )}
               </div>
             </div>
@@ -388,6 +497,11 @@ export default function SocialPracticeSimulator() {
         <div className="text-center mb-12">
           <h1 className="text-5xl font-bold text-gray-800 mb-4">Social Practice Simulator</h1>
           <p className="text-xl text-gray-600">Build confidence through realistic AI-powered conversations</p>
+          <div className="mt-4 inline-block bg-white rounded-lg shadow-md p-4">
+            <p className="text-sm text-gray-700">
+              🧠 <strong>Neurodivergent-Friendly:</strong> Real-time emotion detection, sarcasm alerts, and sensory accommodations
+            </p>
+          </div>
         </div>
         
         <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
@@ -461,6 +575,31 @@ export default function SocialPracticeSimulator() {
               </div>
             </div>
             
+            {analytics.emotionPattern && (
+              <div className="bg-white rounded-xl p-6 shadow-lg">
+                <h3 className="text-xl font-bold text-gray-800 mb-4">🎭 Emotional Pattern Analysis</h3>
+                <div className="bg-purple-50 rounded-lg p-4">
+                  <p className="text-sm text-gray-700 mb-3">
+                    Your most common emotion was <strong className="text-purple-700 capitalize">{analytics.emotionPattern.dominant}</strong> ({analytics.emotionPattern.occurrences} times)
+                  </p>
+                  <div className="space-y-2">
+                    {Object.entries(analytics.emotionPattern.distribution).map(([emotion, count]) => (
+                      <div key={emotion} className="flex items-center gap-3">
+                        <span className="text-sm capitalize w-20 text-gray-700">{emotion}</span>
+                        <div className="flex-1 bg-gray-200 rounded-full h-3">
+                          <div 
+                            className="bg-purple-500 h-3 rounded-full transition-all"
+                            style={{width: `${(count / analytics.totalTurns) * 100}%`}}
+                          ></div>
+                        </div>
+                        <span className="text-sm text-gray-600 w-12">{count}x</span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              </div>
+            )}
+            
             <div className="bg-white rounded-xl p-6 shadow-lg">
               <h3 className="text-xl font-bold text-gray-800 mb-4">Social Cues Recognized</h3>
               <div className="flex flex-wrap gap-3">
@@ -472,12 +611,28 @@ export default function SocialPracticeSimulator() {
               </div>
             </div>
             
+            {analytics.neurodivergentInsights && analytics.neurodivergentInsights.length > 0 && (
+              <div className="bg-gradient-to-r from-purple-50 to-pink-50 rounded-xl p-6 shadow-lg border-2 border-purple-200">
+                <h3 className="text-xl font-bold text-gray-800 mb-4">🧠 Neurodivergent-Specific Insights</h3>
+                <ul className="space-y-3">
+                  {analytics.neurodivergentInsights.map((insight, idx) => (
+                    <li key={idx} className="flex items-start gap-3">
+                      <span className="bg-purple-100 text-purple-600 rounded-full w-6 h-6 flex items-center justify-center flex-shrink-0 font-bold text-sm">
+                        ✓
+                      </span>
+                      <p className="text-gray-700">{insight}</p>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            )}
+            
             <div className="bg-white rounded-xl p-6 shadow-lg">
               <h3 className="text-xl font-bold text-gray-800 mb-4">💡 Improvement Tips</h3>
               <ul className="space-y-3">
                 {analytics.improvementTips?.map((tip, idx) => (
                   <li key={idx} className="flex items-start gap-3">
-                    <span className="bg-indigo-100 text-indigo-600 rounded-full w-6 h-6 flex items-center justify-center flex-shrink-0 font-bold text-sm">
+                     <span className="bg-indigo-100 text-indigo-600 rounded-full w-6 h-6 flex items-center justify-center flex-shrink-0 font-bold text-sm">
                       {idx + 1}
                     </span>
                     <p className="text-gray-700">{tip}</p>
@@ -487,86 +642,119 @@ export default function SocialPracticeSimulator() {
             </div>
             
             <div className="bg-white rounded-xl p-6 shadow-lg">
-              <h3 className="text-xl font-bold text-gray-800 mb-4">📊 Detailed Metrics</h3>
-              <div className="grid md:grid-cols-2 gap-4">
-                <div>
-                  <p className="text-sm text-gray-600">Empathy Score</p>
-                  <div className="flex items-center gap-2 mt-1">
-                    <div className="flex-1 bg-gray-200 rounded-full h-3">
-                      <div 
-                        className="bg-green-500 h-3 rounded-full transition-all"
-                        style={{width: `${analytics.empathyScore}%`}}
-                      ></div>
-                    </div>
-                    <span className="text-sm font-bold text-gray-700">{analytics.empathyScore}%</span>
-                  </div>
+          <h3 className="text-xl font-bold text-gray-800 mb-4">📊 Detailed Metrics</h3>
+          <div className="grid md:grid-cols-2 gap-4">
+            <div>
+              <p className="text-sm text-gray-600">Empathy Score</p>
+              <div className="flex items-center gap-2 mt-1">
+                <div className="flex-1 bg-gray-200 rounded-full h-3">
+                  <div 
+                    className="bg-green-500 h-3 rounded-full transition-all"
+                    style={{width: `${analytics.empathyScore}%`}}
+                  ></div>
                 </div>
-                
-                <div>
-                  <p className="text-sm text-gray-600">Clarity Score</p>
-                  <div className="flex items-center gap-2 mt-1">
-                    <div className="flex-1 bg-gray-200 rounded-full h-3">
-                      <div 
-                        className="bg-blue-500 h-3 rounded-full transition-all"
-                        style={{width: `${analytics.clarityScore}%`}}
-                      ></div>
-                    </div>
-                    <span className="text-sm font-bold text-gray-700">{analytics.clarityScore}%</span>
-                  </div>
-                </div>
-                
-                <div>
-                  <p className="text-sm text-gray-600">Engagement Score</p>
-                  <div className="flex items-center gap-2 mt-1">
-                    <div className="flex-1 bg-gray-200 rounded-full h-3">
-                      <div 
-                        className="bg-purple-500 h-3 rounded-full transition-all"
-                        style={{width: `${analytics.engagementScore}%`}}
-                      ></div>
-                    </div>
-                    <span className="text-sm font-bold text-gray-700">{analytics.engagementScore}%</span>
-                  </div>
-                </div>
-                
-                <div>
-                  <p className="text-sm text-gray-600">Appropriateness Score</p>
-                  <div className="flex items-center gap-2 mt-1">
-                    <div className="flex-1 bg-gray-200 rounded-full h-3">
-                      <div 
-                        className="bg-orange-500 h-3 rounded-full transition-all"
-                        style={{width: `${analytics.appropriatenessScore}%`}}
-                      ></div>
-                    </div>
-                    <span className="text-sm font-bold text-gray-700">{analytics.appropriatenessScore}%</span>
-                  </div>
-                </div>
+                <span className="text-sm font-bold text-gray-700">{analytics.empathyScore}%</span>
               </div>
             </div>
+            
+            <div>
+              <p className="text-sm text-gray-600">Clarity Score</p>
+              <div className="flex items-center gap-2 mt-1">
+                <div className="flex-1 bg-gray-200 rounded-full h-3">
+                  <div 
+                    className="bg-blue-500 h-3 rounded-full transition-all"
+                    style={{width: `${analytics.clarityScore}%`}}
+                  ></div>
+                </div>
+                <span className="text-sm font-bold text-gray-700">{analytics.clarityScore}%</span>
+              </div>
+            </div>
+            
+            <div>
+              <p className="text-sm text-gray-600">Engagement Score</p>
+              <div className="flex items-center gap-2 mt-1">
+                <div className="flex-1 bg-gray-200 rounded-full h-3">
+                  <div 
+                    className="bg-purple-500 h-3 rounded-full transition-all"
+                    style={{width: `${analytics.engagementScore}%`}}
+                  ></div>
+                </div>
+                <span className="text-sm font-bold text-gray-700">{analytics.engagementScore}%</span>
+              </div>
+            </div>
+            
+            <div>
+              <p className="text-sm text-gray-600">Appropriateness Score</p>
+              <div className="flex items-center gap-2 mt-1">
+                <div className="flex-1 bg-gray-200 rounded-full h-3">
+                  <div 
+                    className="bg-orange-500 h-3 rounded-full transition-all"
+                    style={{width: `${analytics.appropriatenessScore}%`}}
+                  ></div>
+                </div>
+                <span className="text-sm font-bold text-gray-700">{analytics.appropriatenessScore}%</span>
+              </div>
+            </div>
+            
+            {analytics.emotionalRegulationScore && (
+              <div>
+                <p className="text-sm text-gray-600">Emotional Regulation Score</p>
+                <div className="flex items-center gap-2 mt-1">
+                  <div className="flex-1 bg-gray-200 rounded-full h-3">
+                    <div 
+                      className="bg-pink-500 h-3 rounded-full transition-all"
+                      style={{width: `${analytics.emotionalRegulationScore}%`}}
+                    ></div>
+                  </div>
+                  <span className="text-sm font-bold text-gray-700">{analytics.emotionalRegulationScore}%</span>
+                </div>
+              </div>
+            )}
+          </div>
+        </div>
+        
+        {analytics.strengths && analytics.strengths.length > 0 && (
+          <div className="bg-green-50 rounded-xl p-6 shadow-lg border-2 border-green-200">
+            <h3 className="text-xl font-bold text-gray-800 mb-4">💪 Your Strengths</h3>
+            <ul className="space-y-2">
+              {analytics.strengths.map((strength, idx) => (
+                <li key={idx} className="flex items-center gap-2 text-gray-700">
+                  <span className="text-green-600">✓</span>
+                  {strength}
+                </li>
+              ))}
+            </ul>
           </div>
         )}
-        
-        <div className="flex justify-center gap-4 mt-8">
-          <button
-            onClick={() => {
-              setView('selection');
-              setMessages([]);
-              setSessionId(null);
-              setAnalytics(null);
-            }}
-            className="bg-indigo-600 text-white px-8 py-3 rounded-lg hover:bg-indigo-700 transition-colors font-semibold"
-          >
-            Practice Another Scenario
-          </button>
-        </div>
       </div>
+    )}
+      
+    
+    <div className="flex justify-center gap-4 mt-8">
+      <button
+        onClick={() => {
+          setView('selection');
+          setMessages([]);
+          setSessionId(null);
+          setAnalytics(null);
+          setConversationStats({
+            turnCount: 0,
+            avgResponseTime: 0,
+            socialCuesDetected: []
+          });
+        }}
+        className="bg-indigo-600 text-white px-8 py-3 rounded-lg hover:bg-indigo-700 transition-colors font-semibold"
+      >
+        Practice Another Scenario
+      </button>
     </div>
-  );
-
-  return (
-    <div>
-      {view === 'selection' && renderScenarioSelection()}
-      {view === 'conversation' && renderConversation()}
-      {view === 'results' && renderResults()}
-    </div>
-  );
+   </div>
+);
+  // Main render logic
+  if (view === 'selection') return renderScenarioSelection();
+  if (view === 'conversation') return renderConversation();
+  if (view === 'results') return renderResults();
+  
+  return null;
 }
+</div>
