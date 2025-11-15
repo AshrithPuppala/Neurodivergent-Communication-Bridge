@@ -17,8 +17,6 @@ app.use(cors({
 }));
 app.use(express.json());
 
-app.use(express.json());
-
 const sessions = new Map();
 
 const scenarioConfigs = {
@@ -60,6 +58,19 @@ const scenarioConfigs = {
   }
 };
 
+// Root route
+app.get('/', (req, res) => {
+  res.json({ 
+    message: 'Social Practice Simulator Backend API',
+    status: 'running',
+    endpoints: ['/api/health', '/api/start-session', '/api/conversation', '/api/end-session']
+  });
+});
+
+app.get('/api/health', (req, res) => {
+  res.json({ status: 'ok', activeConnections: sessions.size });
+});
+
 app.post('/api/start-session', async (req, res) => {
   try {
     const { scenarioId } = req.body;
@@ -98,14 +109,14 @@ app.post('/api/start-session', async (req, res) => {
       initialMessage,
       socialCues: config.socialCues
     });
-} catch (error) {
-  console.error('❌ Error in conversation:', error.message);
-  res.status(500).json({ 
-    error: 'Failed to process message', 
-    details: error.message,
-    hint: 'Check if GOOGLE_API_KEY is set in environment variables'
-  });
-}
+  } catch (error) {
+    console.error('❌ Error starting session:', error.message);
+    res.status(500).json({ 
+      error: 'Failed to start session', 
+      details: error.message
+    });
+  }
+});
 
 app.post('/api/conversation', async (req, res) => {
   try {
@@ -152,8 +163,12 @@ app.post('/api/conversation', async (req, res) => {
       }
     });
   } catch (error) {
-    console.error('Error in conversation:', error);
-    res.status(500).json({ error: 'Failed to process message' });
+    console.error('❌ Error in conversation:', error.message);
+    res.status(500).json({ 
+      error: 'Failed to process message', 
+      details: error.message,
+      hint: 'Check if GOOGLE_API_KEY is set in environment variables'
+    });
   }
 });
 
@@ -188,20 +203,29 @@ async function callGemini(prompt, conversationHistory = null) {
   console.log('✅ Calling Gemini API...');
   const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-pro:generateContent?key=${API_KEY}`;
   
- const response = await fetch(url, {
-  method: 'POST',
-  headers: { 'Content-Type': 'application/json' },
-  body: JSON.stringify({ contents })
-});
+  let contents;
+  if (conversationHistory) {
+    contents = conversationHistory;
+  } else {
+    contents = [{
+      parts: [{ text: prompt }]
+    }];
+  }
+  
+  const response = await fetch(url, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ contents })
+  });
 
-if (!response.ok) {
-  const errorData = await response.json();
-  console.error('❌ Gemini API Error:', errorData);
-  throw new Error(`Gemini API error: ${JSON.stringify(errorData)}`);
-}
+  if (!response.ok) {
+    const errorData = await response.json();
+    console.error('❌ Gemini API Error:', errorData);
+    throw new Error(`Gemini API error: ${JSON.stringify(errorData)}`);
+  }
 
-const data = await response.json();
-console.log('✅ Gemini API response received');
+  const data = await response.json();
+  console.log('✅ Gemini API response received');
   
   if (data.candidates && data.candidates[0] && data.candidates[0].content) {
     return data.candidates[0].content.parts[0].text;
@@ -363,10 +387,6 @@ Evaluate based on: appropriate responses to social cues, empathy, clarity, engag
     duration: Math.floor(duration)
   };
 }
-// Root route
-app.get('/api/health', (req, res) => {
-  res.json({ status: 'ok', activeConnections: sessions.size });
-});
 
 app.listen(PORT, () => {
   console.log(`Social Practice Simulator backend running on port ${PORT}`);
