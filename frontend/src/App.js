@@ -254,8 +254,9 @@ const handleUserMessage = useCallback(async (text) => {
         <div className="max-w-4xl mx-auto flex items-center justify-between">
           <div>
             <h2 className="text-2xl font-bold text-gray-800">{selectedScenario?.name}</h2>
-           <p className="text-sm text-gray-600">Turn {conversationStats?.turnCount || 0} • Practice Session</p>
-          
+            <p className="text-sm text-gray-600">Turn {conversationStats?.turnCount || 0} • Practice Session</p>
+          </div>
+
           <div className="flex gap-3">
             <button
               onClick={() => setShowHints(!showHints)}
