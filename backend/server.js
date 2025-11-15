@@ -169,16 +169,12 @@ app.post('/api/end-session', async (req, res) => {
 // Helper function to call Gemini API
 async function callGemini(prompt, conversationHistory = null) {
   const API_KEY = process.env.GOOGLE_API_KEY;
-  const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-pro:generateContent?key=${API_KEY}`;
   
-  let contents;
-  if (conversationHistory) {
-    contents = conversationHistory;
-  } else {
-    contents = [{
-      parts: [{ text: prompt }]
-    }];
+  if (!API_KEY) {
+    throw new Error('GOOGLE_API_KEY not configured');
   }
+  
+  const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-pro:generateContent?key=${API_KEY}`;
   
   const response = await fetch(url, {
     method: 'POST',
