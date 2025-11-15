@@ -748,8 +748,10 @@ export default function SocialPracticeSimulator() {
         Practice Another Scenario
       </button>
     </div>
-   </div>
-);
+      </div>
+    </div>
+  );
+
   // Main render logic
   if (view === 'selection') return renderScenarioSelection();
   if (view === 'conversation') return renderConversation();
@@ -757,4 +759,3 @@ export default function SocialPracticeSimulator() {
   
   return null;
 }
-</div>
