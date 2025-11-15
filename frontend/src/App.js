@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { Mic, MicOff, MessageSquare, BarChart3, Settings, Play, Pause, TrendingUp } from 'lucide-react';
 
-const API_URL = 'https://neurodivergent-communication-bridge-4neh.onrender.com/'; // Replace with your Render backend URL
+const API_URL = 'https://neurodivergent-communication-bridge-4neh.onrender.com';// Replace with your Render backend URL
 
 const scenarios = [
   { id: 'workplace_meeting', name: 'Team Meeting', context: 'workplace', difficulty: 'medium', description: 'Participate in a team standup meeting' },
