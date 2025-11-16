@@ -12,28 +12,34 @@ import assemblyai as aai
 
 # --- Google Gemini Client (for LLM Analysis) ---
 try:
-    genai.configure() 
+    # Get API key from environment variable
+    google_api_key = os.environ.get("GOOGLE_API_KEY")
+    if not google_api_key:
+        raise Exception("GOOGLE_API_KEY environment variable not set")
+    
+    genai.configure(api_key=google_api_key) 
     gemini_model = genai.GenerativeModel('gemini-1.5-flash')
-    print("Gemini client initialized successfully.")
+    print("✓ Gemini client initialized successfully.")
 except Exception as e:
-    print(f"Error initializing Google Gemini client: {e}")
-    print("Please make sure your GOOGLE_API_KEY environment variable is set.")
+    print(f"✗ Error initializing Google Gemini client: {e}")
+    gemini_model = None
 
 # --- AssemblyAI Client (for Transcription & Diarization) ---
 try:
-    # This automatically reads the ASSEMBLYAI_API_KEY from your environment
-    aai.settings.api_key = os.environ.get("ASSEMBLYAI_API_KEY")
-    if aai.settings.api_key is None:
-        raise Exception("ASSEMBLYAI_API_KEY not set")
-    print("AssemblyAI client initialized successfully.")
+    assemblyai_api_key = os.environ.get("ASSEMBLYAI_API_KEY")
+    if not assemblyai_api_key:
+        raise Exception("ASSEMBLYAI_API_KEY environment variable not set")
+    
+    aai.settings.api_key = assemblyai_api_key
+    print("✓ AssemblyAI client initialized successfully.")
 except Exception as e:
-    print(f"Error initializing AssemblyAI client: {e}")
+    print(f"✗ Error initializing AssemblyAI client: {e}")
 
 app = Flask(__name__)
 
-# IMPORTANT: Add CORS to allow frontend to communicate
+# CORS configuration - allow all origins for now
 CORS(app, 
-     resources={r"/*": {"origins": "*"}},  # Allow all origins for now
+     resources={r"/*": {"origins": "*"}},
      allow_headers=["Content-Type"],
      methods=["GET", "POST", "OPTIONS"]
 )
@@ -42,6 +48,7 @@ UPLOAD_FOLDER = 'uploads'
 if not os.path.exists(UPLOAD_FOLDER):
     os.makedirs(UPLOAD_FOLDER)
 app.config['UPLOAD_FOLDER'] = UPLOAD_FOLDER
+app.config['MAX_CONTENT_LENGTH'] = 50 * 1024 * 1024  # 50MB max file size
 
 # A set of common filler words for quick checking.
 FILLER_WORDS = {
@@ -54,29 +61,37 @@ You are a professional speech-language pathologist. You will be given a JSON
 list of words from a user's speech, complete with 'start' and 'end' timestamps.
 Your task is to analyze this transcript for speech disfluencies,
 which include stutters and stammers.
+
 Specifically, look for:
-1.  *Whole-Word Repetitions:* (e.g., "I-I-I want to go").
-2.  *Blocks / Long Pauses:* (e.g., a long pause before a word, "I want... [2.0 sec pause] ...to go").
-3.  *Interjections / Fillers:* (e.g., "I, uh, want to, um, go").
+1. *Whole-Word Repetitions:* (e.g., "I-I-I want to go").
+2. *Blocks / Long Pauses:* (e.g., a long pause before a word, "I want... [2.0 sec pause] ...to go").
+3. *Interjections / Fillers:* (e.g., "I, uh, want to, um, go").
+
 Analyze the data and return a JSON object with a single key "feedback", 
 which contains a list of suggestion objects. 
+
 Each suggestion object must have the following keys:
 - "start_time": The start time of the issue (in seconds).
 - "end_time": The end time of the issue (in seconds).
 - "issue": A short description (e.g., "Stutter (Repetition)", "Stammer (Block)", "Filler Word").
 - "suggestion": A brief, constructive tip for improvement.
+
 If no issues are found, return an empty "feedback" list.
 ONLY output the raw JSON object, starting with { and ending with }.
 """
 
-# --- 4. Helper Function: Get LLM Feedback (MODIFIED FOR GEMINI) ---
+# --- 4. Helper Function: Get LLM Feedback ---
 def get_feedback_for_speaker(speaker_words_list):
     """
-    Sends a list of words to the FREE Google Gemini API for analysis 
+    Sends a list of words to Google Gemini API for analysis 
     and returns the feedback JSON.
     """
     if not speaker_words_list:
         return {"feedback": []}
+    
+    if not gemini_model:
+        return {"feedback": [{"issue": "API Error", "suggestion": "Gemini API not initialized"}]}
+    
     try:
         # Convert AssemblyAI word objects to a simple format for Gemini
         formatted_list = [
@@ -100,7 +115,7 @@ def get_feedback_for_speaker(speaker_words_list):
         print(f"Error analyzing speaker with Gemini: {e}")
         return {"feedback": [{"issue": "Analysis Error", "suggestion": str(e)}]}
 
-# --- 5. Helper Function: Score Disfluency (MODIFIED FOR ASSEMBLYAI) ---
+# --- 5. Helper Function: Score Disfluency ---
 def calculate_disfluency_score(word_list):
     """
     Calculates a simple disfluency score based on fillers, 
@@ -109,10 +124,11 @@ def calculate_disfluency_score(word_list):
     score = 0
     if not word_list:
         return 0
+    
     for i, word in enumerate(word_list):
-        # AssemblyAI object uses .text
         clean_word = word.text.lower().strip(".,?!")
         
+        # Check for filler words
         if clean_word in FILLER_WORDS:
             score += 1
             
@@ -120,20 +136,35 @@ def calculate_disfluency_score(word_list):
             prev_word = word_list[i-1]
             prev_clean_word = prev_word.text.lower().strip(".,?!")
             
-            # Repetition
+            # Check for repetition
             if clean_word == prev_clean_word and len(clean_word) > 0:
                 score += 1
                 
-            # Long Pause (AssemblyAI timestamps are in milliseconds)
+            # Check for long pause (AssemblyAI timestamps are in milliseconds)
             pause_duration_ms = word.start - prev_word.end
-            if pause_duration_ms > 1500: # 1.5 seconds
+            if pause_duration_ms > 1500:  # 1.5 seconds
                 score += 1
+    
     return score
 
-# --- 6. The Main Flask Route (MODIFIED FOR ASSEMBLYAI) ---
+# --- 6. Health Check Endpoint ---
+@app.route('/', methods=['GET'])
+def health_check():
+    return jsonify({
+        "status": "healthy",
+        "message": "Speech Analysis API is running",
+        "endpoints": {
+            "analyze": "/analyze_conversation (POST)"
+        }
+    }), 200
 
+# --- 7. The Main Flask Route ---
 @app.route('/analyze_conversation', methods=['POST'])
 def handle_conversation_analysis():
+    """
+    Main endpoint to analyze speech from an audio file.
+    Expects a POST request with 'audio_file' in multipart/form-data.
+    """
     
     if 'audio_file' not in request.files:
         return jsonify({"error": "No 'audio_file' part in the request"}), 400
@@ -146,10 +177,11 @@ def handle_conversation_analysis():
     temp_path = os.path.join(app.config['UPLOAD_FOLDER'], filename)
     
     try:
+        # Save the uploaded file
         file.save(temp_path)
+        print(f"File saved to: {temp_path}")
         
         # --- STEP 1: Call AssemblyAI API ---
-        # This one API call does BOTH transcription and diarization
         print("Starting transcription and diarization with AssemblyAI...")
         
         config = aai.TranscriptionConfig(speaker_labels=True)
@@ -164,7 +196,7 @@ def handle_conversation_analysis():
         speaker_b_words = []
         
         if not transcript.words:
-             return jsonify({"error": "AssemblyAI could not transcribe any words."}), 500
+            return jsonify({"error": "AssemblyAI could not transcribe any words."}), 500
 
         # --- STEP 2: Separate Words by Speaker ---
         for word in transcript.words:
@@ -174,9 +206,9 @@ def handle_conversation_analysis():
                 speaker_b_words.append(word)
 
         if not speaker_a_words and not speaker_b_words:
-             return jsonify({"error": "Diarization failed. Could not assign words to speakers."}), 500
+            return jsonify({"error": "Diarization failed. Could not assign words to speakers."}), 500
         
-        print("Transcription complete. Separating speakers...")
+        print(f"Transcription complete. Speaker A: {len(speaker_a_words)} words, Speaker B: {len(speaker_b_words)} words")
 
         # --- STEP 3: Score Both Speakers ---
         score_a = calculate_disfluency_score(speaker_a_words)
@@ -196,7 +228,11 @@ def handle_conversation_analysis():
         print(f"Targeting Speaker {target_speaker_id} for analysis.")
             
         if not target_words_list:
-            return jsonify({"feedback": "Analysis complete. The target speaker had no discernible words."})
+            return jsonify({
+                "analyzed_speaker_id": target_speaker_id,
+                "reason": "Target speaker had no discernible words.",
+                "feedback": "YOUR SPEECH IS AMAZING"
+            }), 200
 
         # --- STEP 5: Call Gemini for Analysis ---
         analysis_results = get_feedback_for_speaker(target_words_list)
@@ -204,25 +240,42 @@ def handle_conversation_analysis():
         print("Analysis complete.")
         
         # --- STEP 6: Return Final Result ---
+        feedback_list = analysis_results.get("feedback", [])
+        
+        # If no feedback, return positive message
+        if not feedback_list:
+            feedback_content = "YOUR SPEECH IS AMAZING"
+        else:
+            feedback_content = feedback_list
+        
         final_results = {
             "analyzed_speaker_id": target_speaker_id,
             "reason": f"Speaker {target_speaker_id} had a higher disfluency score.",
-            "feedback": analysis_results.get("feedback", [])
+            "feedback": feedback_content,
+            "scores": {
+                "speaker_a": score_a,
+                "speaker_b": score_b
+            }
         }
         
         return jsonify(final_results), 200
 
     except Exception as e:
         print(f"An error occurred: {e}")
-        return jsonify({"error": f"An server error occurred: {e}"}), 500
+        import traceback
+        traceback.print_exc()
+        return jsonify({"error": f"Server error: {str(e)}"}), 500
         
     finally:
         # Clean up: remove the temporary file
         if os.path.exists(temp_path):
             os.remove(temp_path)
+            print(f"Cleaned up temporary file: {temp_path}")
 
-# --- 7. Run the App ---
+# --- 8. Run the App ---
 if __name__ == '__main__':
     port = int(os.environ.get('PORT', 5000))
-    print(f"Starting Flask server on port {port}...")
+    print(f"\n{'='*50}")
+    print(f"🚀 Starting Flask server on port {port}...")
+    print(f"{'='*50}\n")
     app.run(debug=False, host='0.0.0.0', port=port)
