@@ -39,56 +39,64 @@ export default function SocialPracticeSimulator({ onBack }) {
   const recognitionRef = useRef(null);
   const messagesEndRef = useRef(null);
 
-  const handleUserMessage = useCallback(async (text) => {
-    if (!text.trim() || isProcessing) return;
+ // ❌ DELETE THIS OLD VERSION:
+const handleUserMessage = useCallback(async (text) => {
+  // ... old code without window.speechSynthesis.cancel() ...
+}, [sessionId, isProcessing, sensorySettings.muteAudio]);
+
+// ✅ REPLACE WITH THIS NEW VERSION:
+const handleUserMessage = useCallback(async (text) => {
+  if (!text.trim() || isProcessing) return;
+  
+  const userMessage = {
+    role: 'user',
+    content: text,
+    timestamp: Date.now()
+  };
+  
+  setMessages(prev => [...prev, userMessage]);
+  setIsProcessing(true);
+  
+  try {
+    const response = await fetch(`${API_URL}/api/conversation`, {  // ⚠️ Note: parentheses, not backticks
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        sessionId,
+        userMessage: text
+      })
+    });
     
-    const userMessage = {
-      role: 'user',
-      content: text,
+    const data = await response.json();
+    
+    const aiMessage = {
+      role: 'ai',
+      content: data.aiResponse,
+      cues: data.socialCues || [],
+      hints: data.hints || [],
+      userEmotionFeedback: data.userEmotionFeedback || null,
+      sarcasmWarning: data.sarcasmWarning || null,
       timestamp: Date.now()
     };
     
-    setMessages(prev => [...prev, userMessage]);
-    setIsProcessing(true);
+    setMessages(prev => [...prev, aiMessage]);
+    setConversationStats(data.stats);
     
-    try {
-      const response = await fetch(`${API_URL}/api/conversation`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          sessionId,
-          userMessage: text
-        })
-      });
-      
-      const data = await response.json();
-      
-      const aiMessage = {
-        role: 'ai',
-        content: data.aiResponse,
-        cues: data.socialCues || [],
-        hints: data.hints || [],
-        userEmotionFeedback: data.userEmotionFeedback || null,
-        sarcasmWarning: data.sarcasmWarning || null,
-        timestamp: Date.now()
-      };
-      
-      setMessages(prev => [...prev, aiMessage]);
-      setConversationStats(data.stats);
-      
-      if (!sensorySettings.muteAudio) {
-        const utterance = new SpeechSynthesisUtterance(data.aiResponse);
-        utterance.rate = 0.9;
-        utterance.pitch = 1;
-        window.speechSynthesis.speak(utterance);
-      }
-    } catch (error) {
-      console.error('Error in conversation:', error);
+    // FIX: Stop any playing speech before starting new one
+    if (!sensorySettings.muteAudio) {
+      window.speechSynthesis.cancel(); // Stop previous speech
+      const utterance = new SpeechSynthesisUtterance(data.aiResponse);
+      utterance.rate = 0.9;
+      utterance.pitch = 1;
+      window.speechSynthesis.speak(utterance);
     }
-    
-    setIsProcessing(false);
-  }, [sessionId, isProcessing, sensorySettings.muteAudio]);
-
+  } catch (error) {
+    console.error('Error in conversation:', error);
+  }
+  
+  setIsProcessing(false);
+}, [sessionId, isProcessing, sensorySettings.muteAudio]);
+  
   useEffect(() => {
     if ('webkitSpeechRecognition' in window) {
       const SpeechRecognition = window.webkitSpeechRecognition;
