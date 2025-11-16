@@ -118,19 +118,23 @@ def get_feedback_for_speaker(speaker_words_list):
         
         full_prompt = f"{SPEECH_COACH_PROMPT}\n\nHere is the speech data:\n{user_content}"
         
-        # Try with response_mime_type first (newer API), fallback to basic call
-        try:
-            response = gemini_model.generate_content(
-                full_prompt,
-                generation_config={
-                    "response_mime_type": "application/json"
-                }
-            )
-        except TypeError:
-            # Fallback for older API version
-            response = gemini_model.generate_content(full_prompt)
+        # Call Gemini without response_mime_type (not supported in this version)
+        response = gemini_model.generate_content(full_prompt)
         
-        return json.loads(response.text)
+        # Extract JSON from response text (might have markdown formatting)
+        response_text = response.text.strip()
+        
+        # Remove markdown code blocks if present
+        if response_text.startswith("```json"):
+            response_text = response_text[7:]  # Remove ```json
+        if response_text.startswith("```"):
+            response_text = response_text[3:]  # Remove ```
+        if response_text.endswith("```"):
+            response_text = response_text[:-3]  # Remove trailing ```
+        
+        response_text = response_text.strip()
+        
+        return json.loads(response_text)
     
     except Exception as e:
         print(f"Error analyzing speaker with Gemini: {e}")
