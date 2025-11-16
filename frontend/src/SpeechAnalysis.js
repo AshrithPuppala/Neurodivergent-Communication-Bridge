@@ -25,32 +25,27 @@ export default function SpeechAnalysis({ onBack }) {
     setIsAnalyzing(true);
     setError(null);
 
-    const formData = new FormData();
-    formData.append('audio_file', audioFile);
-    
-    const response = await fetch(API_URL, {
-      method: 'POST',
-      body: formData,
-      // Don't set Content-Type header - let browser set it automatically with boundary
-    });
-
     try {
-      // TODO: Replace with your actual Python Flask backend URL on Render after deployment
+      const formData = new FormData();
+      formData.append('audio_file', selectedFile); // FIXED: was audioFile, now selectedFile
+      
       const PYTHON_BACKEND_URL = 'https://neurodivergent-communication-bridge-part1.onrender.com';
       
       const response = await fetch(`${PYTHON_BACKEND_URL}/analyze_conversation`, {
         method: 'POST',
         body: formData,
+        // Don't set Content-Type header - let browser set it automatically with boundary
       });
 
       if (!response.ok) {
-        throw new Error('Analysis failed');
+        const errorData = await response.json().catch(() => ({}));
+        throw new Error(errorData.error || 'Analysis failed');
       }
 
       const data = await response.json();
       setResults(data);
     } catch (err) {
-      setError('Failed to analyze audio. Please try again.');
+      setError(`Failed to analyze audio: ${err.message}`);
       console.error('Analysis error:', err);
     } finally {
       setIsAnalyzing(false);
@@ -126,9 +121,24 @@ export default function SpeechAnalysis({ onBack }) {
                   <strong>Analyzed Speaker:</strong> Speaker {results.analyzed_speaker_id}
                 </p>
                 <p className="text-sm text-gray-600">{results.reason}</p>
+                {results.scores && (
+                  <div className="mt-3 text-sm text-gray-600">
+                    <p>Speaker A Score: {results.scores.speaker_a}</p>
+                    <p>Speaker B Score: {results.scores.speaker_b}</p>
+                  </div>
+                )}
               </div>
 
-              {results.feedback && results.feedback.length > 0 ? (
+              {results.feedback === "YOUR SPEECH IS AMAZING" ? (
+                <div className="bg-green-50 border-2 border-green-200 rounded-lg p-6 text-center">
+                  <p className="text-green-800 font-bold text-xl">
+                    🎉 YOUR SPEECH IS AMAZING! 🎉
+                  </p>
+                  <p className="text-green-700 mt-2">
+                    No significant disfluencies detected. Great job!
+                  </p>
+                </div>
+              ) : results.feedback && Array.isArray(results.feedback) && results.feedback.length > 0 ? (
                 <div className="space-y-4">
                   <h3 className="text-xl font-bold text-gray-800">Feedback & Suggestions</h3>
                   {results.feedback.map((item, idx) => (
