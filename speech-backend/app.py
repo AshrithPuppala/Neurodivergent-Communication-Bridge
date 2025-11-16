@@ -1,255 +1,340 @@
-import React, { useState, useRef } from 'react';
-import { Upload, Loader, ArrowLeft, AlertCircle } from 'lucide-react';
+import os
+import json
+import time
+from flask import Flask, request, jsonify
+from flask_cors import CORS
 
-const API_URL = 'https://neurodivergent-communication-bridge-4neh.onrender.com';
+# --- 1. Library Imports ---
+import google.generativeai as genai
+import assemblyai as aai
 
-export default function SpeechAnalysis({ onBack }) {
-  const [selectedFile, setSelectedFile] = useState(null);
-  const [isAnalyzing, setIsAnalyzing] = useState(false);
-  const [results, setResults] = useState(null);
-  const [error, setError] = useState(null);
-  const fileInputRef = useRef(null);
+# --- 2. Initialization ---
 
-  const handleFileSelect = (event) => {
-    const file = event.target.files?.[0];
-    if (file) {
-      // Check file type
-      const validTypes = ['audio/mp3', 'audio/wav', 'audio/mpeg', 'audio/m4a', 'audio/mp4'];
-      const fileExtension = file.name.split('.').pop().toLowerCase();
-      const validExtensions = ['mp3', 'wav', 'm4a', 'mp4'];
-      
-      if (!validTypes.includes(file.type) && !validExtensions.includes(fileExtension)) {
-        setError('Please select a valid audio file (MP3, WAV, M4A)');
-        return;
-      }
-      
-      // Check file size (50MB limit)
-      if (file.size > 50 * 1024 * 1024) {
-        setError('File size must be less than 50MB');
-        return;
-      }
-      
-      setSelectedFile(file);
-      setError(null);
-      setResults(null);
-    }
-  };
+# --- Google Gemini Client (for LLM Analysis) ---
+try:
+    # Get API key from environment variable
+    google_api_key = os.environ.get("GOOGLE_API_KEY")
+    if not google_api_key:
+        raise Exception("GOOGLE_API_KEY environment variable not set")
+    
+    genai.configure(api_key=google_api_key) 
+    gemini_model = genai.GenerativeModel('gemini-1.5-flash')
+    print("✓ Gemini client initialized successfully.")
+except Exception as e:
+    print(f"✗ Error initializing Google Gemini client: {e}")
+    gemini_model = None
 
-  const analyzeAudio = async () => {
-    if (!selectedFile) {
-      setError('Please select a file first');
-      return;
-    }
+# --- AssemblyAI Client (for Transcription & Diarization) ---
+try:
+    assemblyai_api_key = os.environ.get("ASSEMBLYAI_API_KEY")
+    if not assemblyai_api_key:
+        raise Exception("ASSEMBLYAI_API_KEY environment variable not set")
+    
+    aai.settings.api_key = assemblyai_api_key
+    print("✓ AssemblyAI client initialized successfully.")
+except Exception as e:
+    print(f"✗ Error initializing AssemblyAI client: {e}")
 
-    setIsAnalyzing(true);
-    setError(null);
+app = Flask(__name__)
 
-    try {
-      const formData = new FormData();
-      formData.append('audio_file', selectedFile);
+# CORS configuration - allow all origins with credentials
+CORS(app, 
+     resources={r"/*": {
+         "origins": "*",
+         "methods": ["GET", "POST", "OPTIONS"],
+         "allow_headers": ["Content-Type", "Authorization"],
+         "expose_headers": ["Content-Type"],
+         "supports_credentials": False
+     }}
+)
 
-      console.log('Sending file to:', `${API_URL}/analyze_conversation`);
-      
-      const response = await fetch(`${API_URL}/analyze_conversation`, {
-        method: 'POST',
-        body: formData,
-        // Don't set Content-Type header - browser will set it with boundary for FormData
-      });
+UPLOAD_FOLDER = 'uploads'
+if not os.path.exists(UPLOAD_FOLDER):
+    os.makedirs(UPLOAD_FOLDER)
+app.config['UPLOAD_FOLDER'] = UPLOAD_FOLDER
+app.config['MAX_CONTENT_LENGTH'] = 50 * 1024 * 1024  # 50MB max file size
 
-      console.log('Response status:', response.status);
-
-      if (!response.ok) {
-        const errorText = await response.text();
-        console.error('Error response:', errorText);
-        throw new Error(`Server error: ${response.status} - ${errorText}`);
-      }
-
-      const data = await response.json();
-      console.log('Analysis results:', data);
-      
-      setResults(data);
-    } catch (err) {
-      console.error('Analysis error:', err);
-      setError(err.message || 'Failed to analyze audio. Please check your connection and try again.');
-    } finally {
-      setIsAnalyzing(false);
-    }
-  };
-
-  const resetAnalysis = () => {
-    setSelectedFile(null);
-    setResults(null);
-    setError(null);
-    if (fileInputRef.current) {
-      fileInputRef.current.value = '';
-    }
-  };
-
-  const renderResults = () => {
-    if (!results) return null;
-
-    const { analyzed_speaker_id, feedback, scores, reason } = results;
-    const isFeedbackString = typeof feedback === 'string';
-
-    return (
-      <div className="space-y-6">
-        <div className="bg-white rounded-lg shadow-md p-6">
-          <h2 className="text-2xl font-bold text-gray-800 mb-4">Analysis Results</h2>
-          
-          <div className="bg-blue-50 border-l-4 border-blue-500 p-4 mb-6">
-            <div className="flex items-start gap-3">
-              <div className="bg-blue-500 text-white rounded-full w-8 h-8 flex items-center justify-center font-bold">
-                {analyzed_speaker_id}
-              </div>
-              <div className="flex-1">
-                <p className="font-bold text-blue-900 mb-1">Analyzed Speaker: {analyzed_speaker_id}</p>
-                <p className="text-sm text-blue-800">{reason}</p>
-              </div>
-            </div>
-          </div>
-
-          {scores && (
-            <div className="bg-gray-50 rounded-lg p-4 mb-6">
-              <h3 className="font-bold text-gray-700 mb-3">Disfluency Scores</h3>
-              <div className="grid grid-cols-2 gap-4">
-                <div className="bg-white rounded p-3">
-                  <p className="text-sm text-gray-600 mb-1">Speaker A</p>
-                  <p className="text-2xl font-bold text-indigo-600">{scores.speaker_a}</p>
-                </div>
-                <div className="bg-white rounded p-3">
-                  <p className="text-sm text-gray-600 mb-1">Speaker B</p>
-                  <p className="text-2xl font-bold text-indigo-600">{scores.speaker_b}</p>
-                </div>
-              </div>
-              <p className="text-xs text-gray-500 mt-2">
-                *Higher scores indicate more disfluencies (fillers, repetitions, pauses)
-              </p>
-            </div>
-          )}
-
-          {isFeedbackString ? (
-            <div className="bg-green-50 border-2 border-green-300 rounded-lg p-6 text-center">
-              <span className="text-4xl mb-3 block">🎉</span>
-              <p className="text-2xl font-bold text-green-700">{feedback}</p>
-            </div>
-          ) : (
-            <div className="space-y-4">
-              <h3 className="font-bold text-gray-700 mb-3">Speech Feedback</h3>
-              {feedback.map((item, index) => (
-                <div key={index} className="bg-yellow-50 border-l-4 border-yellow-500 rounded-r-lg p-4">
-                  <div className="flex items-start justify-between gap-3 mb-2">
-                    <div className="flex-1">
-                      <p className="font-bold text-yellow-900 text-sm">{item.issue}</p>
-                      <p className="text-xs text-yellow-700 mt-1">
-                        Time: {item.start_time?.toFixed(2)}s - {item.end_time?.toFixed(2)}s
-                      </p>
-                    </div>
-                  </div>
-                  <div className="bg-white rounded p-3 mt-2">
-                    <p className="text-sm text-gray-700">
-                      <span className="font-semibold text-gray-900">💡 Tip: </span>
-                      {item.suggestion}
-                    </p>
-                  </div>
-                </div>
-              ))}
-            </div>
-          )}
-        </div>
-
-        <button
-          onClick={resetAnalysis}
-          className="w-full bg-indigo-600 text-white py-3 rounded-lg hover:bg-indigo-700 transition-colors font-semibold"
-        >
-          Analyze Another Recording
-        </button>
-      </div>
-    );
-  };
-
-  return (
-    <div className="min-h-screen bg-gradient-to-br from-purple-50 to-indigo-100 p-8">
-      <div className="max-w-4xl mx-auto">
-        {onBack && (
-          <button
-            onClick={onBack}
-            className="flex items-center gap-2 text-gray-600 hover:text-gray-800 mb-6 transition-colors"
-          >
-            <ArrowLeft size={20} />
-            <span className="font-medium">Back to Home</span>
-          </button>
-        )}
-
-        <div className="bg-white rounded-lg shadow-lg p-8">
-          <div className="text-center mb-8">
-            <h1 className="text-4xl font-bold text-gray-800 mb-2">Speech Analysis</h1>
-            <p className="text-gray-600">Upload a conversation recording for AI-powered analysis</p>
-          </div>
-
-          {!results ? (
-            <div className="space-y-6">
-              <div 
-                className="border-3 border-dashed border-gray-300 rounded-lg p-12 text-center hover:border-indigo-400 transition-colors cursor-pointer bg-gray-50"
-                onClick={() => fileInputRef.current?.click()}
-              >
-                <Upload className="mx-auto mb-4 text-gray-400" size={48} />
-                <p className="text-gray-700 font-medium mb-2">
-                  {selectedFile ? selectedFile.name : 'Click to select audio file'}
-                </p>
-                <p className="text-sm text-gray-500">
-                  Supported formats: MP3, WAV, M4A, etc.
-                </p>
-                <input
-                  ref={fileInputRef}
-                  type="file"
-                  accept="audio/*,.mp3,.wav,.m4a,.mp4"
-                  onChange={handleFileSelect}
-                  className="hidden"
-                />
-              </div>
-
-              {error && (
-                <div className="bg-red-50 border-2 border-red-300 rounded-lg p-4 flex items-start gap-3">
-                  <AlertCircle className="text-red-600 flex-shrink-0" size={24} />
-                  <div>
-                    <p className="font-bold text-red-900">Error</p>
-                    <p className="text-sm text-red-700">{error}</p>
-                  </div>
-                </div>
-              )}
-
-              <button
-                onClick={analyzeAudio}
-                disabled={!selectedFile || isAnalyzing}
-                className={`w-full py-4 rounded-lg font-bold text-lg transition-all ${
-                  !selectedFile || isAnalyzing
-                    ? 'bg-gray-300 text-gray-500 cursor-not-allowed'
-                    : 'bg-indigo-600 text-white hover:bg-indigo-700 shadow-lg hover:shadow-xl'
-                }`}
-              >
-                {isAnalyzing ? (
-                  <span className="flex items-center justify-center gap-3">
-                    <Loader className="animate-spin" size={24} />
-                    Analyzing... This may take a minute
-                  </span>
-                ) : (
-                  'Analyze Conversation'
-                )}
-              </button>
-
-              <div className="bg-blue-50 border-l-4 border-blue-500 p-4 rounded-r-lg">
-                <p className="text-sm text-blue-900">
-                  <span className="font-bold">How it works:</span> Upload an audio file containing a conversation. 
-                  Our AI will transcribe the audio, identify speakers, and analyze speech patterns to provide 
-                  personalized feedback on disfluencies like stutters, stammers, and filler words.
-                </p>
-              </div>
-            </div>
-          ) : (
-            renderResults()
-          )}
-        </div>
-      </div>
-    </div>
-  );
+# A set of common filler words for quick checking.
+FILLER_WORDS = {
+    'um', 'uh', 'like', 'you know', 'so', 'i mean', 'right', 'okay'
 }
+
+# --- 3. The System Prompt (for Gemini) ---
+SPEECH_COACH_PROMPT = """
+You are a professional speech-language pathologist. You will be given a JSON 
+list of words from a user's speech, complete with 'start' and 'end' timestamps.
+Your task is to analyze this transcript for speech disfluencies,
+which include stutters and stammers.
+
+Specifically, look for:
+1. *Whole-Word Repetitions:* (e.g., "I-I-I want to go").
+2. *Blocks / Long Pauses:* (e.g., a long pause before a word, "I want... [2.0 sec pause] ...to go").
+3. *Interjections / Fillers:* (e.g., "I, uh, want to, um, go").
+
+Analyze the data and return a JSON object with a single key "feedback", 
+which contains a list of suggestion objects. 
+
+Each suggestion object must have the following keys:
+- "start_time": The start time of the issue (in seconds).
+- "end_time": The end time of the issue (in seconds).
+- "issue": A short description (e.g., "Stutter (Repetition)", "Stammer (Block)", "Filler Word").
+- "suggestion": A brief, constructive tip for improvement.
+
+If no issues are found, return an empty "feedback" list.
+ONLY output the raw JSON object, starting with { and ending with }.
+"""
+
+# --- 4. Helper Function: Get LLM Feedback ---
+def get_feedback_for_speaker(speaker_words_list):
+    """
+    Sends a list of words to Google Gemini API for analysis 
+    and returns the feedback JSON.
+    """
+    if not speaker_words_list:
+        return {"feedback": []}
+    
+    if not gemini_model:
+        return {"feedback": [{"issue": "API Error", "suggestion": "Gemini API not initialized"}]}
+    
+    try:
+        # Convert AssemblyAI word objects to a simple format for Gemini
+        formatted_list = []
+        for word in speaker_words_list:
+            # Handle both dict and object formats
+            if isinstance(word, dict):
+                formatted_list.append({
+                    "word": word.get('text', ''),
+                    "start": word.get('start', 0) / 1000.0,
+                    "end": word.get('end', 0) / 1000.0
+                })
+            else:
+                formatted_list.append({
+                    "word": word.text,
+                    "start": word.start / 1000.0,
+                    "end": word.end / 1000.0
+                })
+        
+        user_content = json.dumps(formatted_list)
+        
+        full_prompt = f"{SPEECH_COACH_PROMPT}\n\nHere is the speech data:\n{user_content}"
+        
+        # Call Gemini without response_mime_type (not supported in this version)
+        response = gemini_model.generate_content(full_prompt)
+        
+        # Extract JSON from response text (might have markdown formatting)
+        response_text = response.text.strip()
+        
+        # Remove markdown code blocks if present
+        if response_text.startswith("```json"):
+            response_text = response_text[7:]  # Remove ```json
+        if response_text.startswith("```"):
+            response_text = response_text[3:]  # Remove ```
+        if response_text.endswith("```"):
+            response_text = response_text[:-3]  # Remove trailing ```
+        
+        response_text = response_text.strip()
+        
+        return json.loads(response_text)
+    
+    except Exception as e:
+        print(f"Error analyzing speaker with Gemini: {e}")
+        return {"feedback": [{"issue": "Analysis Error", "suggestion": str(e)}]}
+
+# --- 5. Helper Function: Score Disfluency ---
+def calculate_disfluency_score(word_list):
+    """
+    Calculates a simple disfluency score based on fillers, 
+    repetitions, and pauses from AssemblyAI word objects.
+    """
+    score = 0
+    if not word_list:
+        return 0
+    
+    for i, word in enumerate(word_list):
+        # Handle both dict and object formats
+        if isinstance(word, dict):
+            word_text = word.get('text', '')
+            word_start = word.get('start', 0)
+            word_end = word.get('end', 0)
+        else:
+            word_text = word.text
+            word_start = word.start
+            word_end = word.end
+            
+        clean_word = word_text.lower().strip(".,?!")
+        
+        # Check for filler words
+        if clean_word in FILLER_WORDS:
+            score += 1
+            
+        if i > 0:
+            prev_word = word_list[i-1]
+            if isinstance(prev_word, dict):
+                prev_word_text = prev_word.get('text', '')
+                prev_word_end = prev_word.get('end', 0)
+            else:
+                prev_word_text = prev_word.text
+                prev_word_end = prev_word.end
+                
+            prev_clean_word = prev_word_text.lower().strip(".,?!")
+            
+            # Check for repetition
+            if clean_word == prev_clean_word and len(clean_word) > 0:
+                score += 1
+                
+            # Check for long pause (AssemblyAI timestamps are in milliseconds)
+            pause_duration_ms = word_start - prev_word_end
+            if pause_duration_ms > 1500:  # 1.5 seconds
+                score += 1
+    
+    return score
+
+# --- 6. Health Check Endpoint ---
+@app.route('/', methods=['GET', 'OPTIONS'])
+def health_check():
+    if request.method == 'OPTIONS':
+        return '', 204
+    return jsonify({
+        "status": "healthy",
+        "message": "Speech Analysis API is running",
+        "endpoints": {
+            "analyze": "/analyze_conversation (POST)"
+        }
+    }), 200
+
+# --- 7. The Main Flask Route ---
+@app.route('/analyze_conversation', methods=['POST', 'OPTIONS'])
+def handle_conversation_analysis():
+    """
+    Main endpoint to analyze speech from an audio file.
+    Expects a POST request with 'audio_file' in multipart/form-data.
+    """
+    
+    # Handle preflight OPTIONS request
+    if request.method == 'OPTIONS':
+        return '', 204
+    
+    if 'audio_file' not in request.files:
+        return jsonify({"error": "No 'audio_file' part in the request"}), 400
+
+    file = request.files['audio_file']
+    if file.filename == '':
+        return jsonify({"error": "No selected file"}), 400
+
+    filename = f"{int(time.time())}_{file.filename}"
+    temp_path = os.path.join(app.config['UPLOAD_FOLDER'], filename)
+    
+    try:
+        # Save the uploaded file
+        file.save(temp_path)
+        print(f"File saved to: {temp_path}")
+        
+        # --- STEP 1: Call AssemblyAI API ---
+        print("Starting transcription and diarization with AssemblyAI...")
+        
+        config = aai.TranscriptionConfig(speaker_labels=True)
+        transcriber = aai.Transcriber()
+        transcript = transcriber.transcribe(temp_path, config)
+
+        if transcript.status == aai.TranscriptStatus.error:
+            return jsonify({"error": f"AssemblyAI Error: {transcript.error}"}), 500
+        
+        # AssemblyAI labels speakers as 'A', 'B', 'C', etc.
+        speaker_a_words = []
+        speaker_b_words = []
+        
+        if not transcript.words:
+            return jsonify({"error": "AssemblyAI could not transcribe any words."}), 500
+
+        # --- STEP 2: Separate Words by Speaker ---
+        for word in transcript.words:
+            # Check if word has speaker attribute (some transcripts might not have diarization)
+            if hasattr(word, 'speaker'):
+                if word.speaker == 'A':
+                    speaker_a_words.append(word)
+                elif word.speaker == 'B':
+                    speaker_b_words.append(word)
+            else:
+                # If no speaker diarization, treat all as Speaker A
+                speaker_a_words.append(word)
+
+        if not speaker_a_words and not speaker_b_words:
+            return jsonify({"error": "Diarization failed. Could not assign words to speakers."}), 500
+        
+        print(f"Transcription complete. Speaker A: {len(speaker_a_words)} words, Speaker B: {len(speaker_b_words)} words")
+        
+        # Debug: Print first few words to see the structure
+        if speaker_a_words:
+            print(f"Sample Speaker A word: {speaker_a_words[0]}")
+        if speaker_b_words:
+            print(f"Sample Speaker B word: {speaker_b_words[0]}")
+
+        # --- STEP 3: Score Both Speakers ---
+        score_a = calculate_disfluency_score(speaker_a_words)
+        score_b = calculate_disfluency_score(speaker_b_words)
+        
+        print(f"Speaker A Disfluency Score: {score_a}")
+        print(f"Speaker B Disfluency Score: {score_b}")
+
+        # --- STEP 4: Select Target and Analyze ---
+        if score_a > score_b or not speaker_b_words:
+            target_speaker_id = 'A'
+            target_words_list = speaker_a_words
+        else:
+            target_speaker_id = 'B'
+            target_words_list = speaker_b_words
+            
+        print(f"Targeting Speaker {target_speaker_id} for analysis.")
+            
+        if not target_words_list:
+            return jsonify({
+                "analyzed_speaker_id": target_speaker_id,
+                "reason": "Target speaker had no discernible words.",
+                "feedback": "YOUR SPEECH IS AMAZING"
+            }), 200
+
+        # --- STEP 5: Call Gemini for Analysis ---
+        analysis_results = get_feedback_for_speaker(target_words_list)
+        
+        print("Analysis complete.")
+        
+        # --- STEP 6: Return Final Result ---
+        feedback_list = analysis_results.get("feedback", [])
+        
+        # If no feedback, return positive message
+        if not feedback_list:
+            feedback_content = "YOUR SPEECH IS AMAZING"
+        else:
+            feedback_content = feedback_list
+        
+        final_results = {
+            "analyzed_speaker_id": target_speaker_id,
+            "reason": f"Speaker {target_speaker_id} had a higher disfluency score.",
+            "feedback": feedback_content,
+            "scores": {
+                "speaker_a": score_a,
+                "speaker_b": score_b
+            }
+        }
+        
+        return jsonify(final_results), 200
+
+    except Exception as e:
+        print(f"An error occurred: {e}")
+        import traceback
+        traceback.print_exc()
+        return jsonify({"error": f"Server error: {str(e)}"}), 500
+        
+    finally:
+        # Clean up: remove the temporary file
+        if os.path.exists(temp_path):
+            os.remove(temp_path)
+            print(f"Cleaned up temporary file: {temp_path}")
+
+# --- 8. Run the App ---
+if __name__ == '__main__':
+    port = int(os.environ.get('PORT', 5000))
+    print(f"\n{'='*50}")
+    print(f"🚀 Starting Flask server on port {port}...")
+    print(f"{'='*50}\n")
+    app.run(debug=False, host='0.0.0.0', port=port)
