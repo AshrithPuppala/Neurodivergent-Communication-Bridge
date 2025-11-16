@@ -26,7 +26,13 @@ export default function SpeechAnalysis({ onBack }) {
     setError(null);
 
     const formData = new FormData();
-    formData.append('audio_file', selectedFile);
+    formData.append('audio_file', audioFile);
+    
+    const response = await fetch(API_URL, {
+      method: 'POST',
+      body: formData,
+      // Don't set Content-Type header - let browser set it automatically with boundary
+    });
 
     try {
       // TODO: Replace with your actual Python Flask backend URL on Render after deployment
