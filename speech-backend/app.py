@@ -118,12 +118,17 @@ def get_feedback_for_speaker(speaker_words_list):
         
         full_prompt = f"{SPEECH_COACH_PROMPT}\n\nHere is the speech data:\n{user_content}"
         
-        response = gemini_model.generate_content(
-            full_prompt,
-            generation_config=genai.types.GenerationConfig(
-                response_mime_type="application/json" 
+        # Try with response_mime_type first (newer API), fallback to basic call
+        try:
+            response = gemini_model.generate_content(
+                full_prompt,
+                generation_config={
+                    "response_mime_type": "application/json"
+                }
             )
-        )
+        except TypeError:
+            # Fallback for older API version
+            response = gemini_model.generate_content(full_prompt)
         
         return json.loads(response.text)
     
