@@ -39,11 +39,6 @@ export default function SocialPracticeSimulator({ onBack }) {
   const recognitionRef = useRef(null);
   const messagesEndRef = useRef(null);
 
- // ❌ DELETE THIS OLD VERSION:
-const handleUserMessage = useCallback(async (text) => {
-  // ... old code without window.speechSynthesis.cancel() ...
-}, [sessionId, isProcessing, sensorySettings.muteAudio]);
-
 // ✅ REPLACE WITH THIS NEW VERSION:
 const handleUserMessage = useCallback(async (text) => {
   if (!text.trim() || isProcessing) return;
