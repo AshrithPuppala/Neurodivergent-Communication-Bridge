@@ -37,11 +37,15 @@ except Exception as e:
 
 app = Flask(__name__)
 
-# CORS configuration - allow all origins for now
+# CORS configuration - allow all origins with credentials
 CORS(app, 
-     resources={r"/*": {"origins": "*"}},
-     allow_headers=["Content-Type"],
-     methods=["GET", "POST", "OPTIONS"]
+     resources={r"/*": {
+         "origins": "*",
+         "methods": ["GET", "POST", "OPTIONS"],
+         "allow_headers": ["Content-Type", "Authorization"],
+         "expose_headers": ["Content-Type"],
+         "supports_credentials": False
+     }}
 )
 
 UPLOAD_FOLDER = 'uploads'
