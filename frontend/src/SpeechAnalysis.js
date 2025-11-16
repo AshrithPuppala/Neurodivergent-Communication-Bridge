@@ -30,7 +30,7 @@ export default function SpeechAnalysis({ onBack }) {
 
     try {
       // TODO: Replace with your actual Python Flask backend URL on Render after deployment
-      const PYTHON_BACKEND_URL = 'https://YOUR-PYTHON-BACKEND-NAME.onrender.com';
+      const PYTHON_BACKEND_URL = 'https://neurodivergent-communication-bridge-part1.onrender.com';
       
       const response = await fetch(`${PYTHON_BACKEND_URL}/analyze_conversation`, {
         method: 'POST',
