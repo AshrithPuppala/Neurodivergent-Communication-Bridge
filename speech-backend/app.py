@@ -98,10 +98,22 @@ def get_feedback_for_speaker(speaker_words_list):
     
     try:
         # Convert AssemblyAI word objects to a simple format for Gemini
-        formatted_list = [
-            {"word": word.text, "start": word.start / 1000.0, "end": word.end / 1000.0}
-            for word in speaker_words_list
-        ]
+        formatted_list = []
+        for word in speaker_words_list:
+            # Handle both dict and object formats
+            if isinstance(word, dict):
+                formatted_list.append({
+                    "word": word.get('text', ''),
+                    "start": word.get('start', 0) / 1000.0,
+                    "end": word.get('end', 0) / 1000.0
+                })
+            else:
+                formatted_list.append({
+                    "word": word.text,
+                    "start": word.start / 1000.0,
+                    "end": word.end / 1000.0
+                })
+        
         user_content = json.dumps(formatted_list)
         
         full_prompt = f"{SPEECH_COACH_PROMPT}\n\nHere is the speech data:\n{user_content}"
@@ -130,7 +142,17 @@ def calculate_disfluency_score(word_list):
         return 0
     
     for i, word in enumerate(word_list):
-        clean_word = word.text.lower().strip(".,?!")
+        # Handle both dict and object formats
+        if isinstance(word, dict):
+            word_text = word.get('text', '')
+            word_start = word.get('start', 0)
+            word_end = word.get('end', 0)
+        else:
+            word_text = word.text
+            word_start = word.start
+            word_end = word.end
+            
+        clean_word = word_text.lower().strip(".,?!")
         
         # Check for filler words
         if clean_word in FILLER_WORDS:
@@ -138,22 +160,31 @@ def calculate_disfluency_score(word_list):
             
         if i > 0:
             prev_word = word_list[i-1]
-            prev_clean_word = prev_word.text.lower().strip(".,?!")
+            if isinstance(prev_word, dict):
+                prev_word_text = prev_word.get('text', '')
+                prev_word_end = prev_word.get('end', 0)
+            else:
+                prev_word_text = prev_word.text
+                prev_word_end = prev_word.end
+                
+            prev_clean_word = prev_word_text.lower().strip(".,?!")
             
             # Check for repetition
             if clean_word == prev_clean_word and len(clean_word) > 0:
                 score += 1
                 
             # Check for long pause (AssemblyAI timestamps are in milliseconds)
-            pause_duration_ms = word.start - prev_word.end
+            pause_duration_ms = word_start - prev_word_end
             if pause_duration_ms > 1500:  # 1.5 seconds
                 score += 1
     
     return score
 
 # --- 6. Health Check Endpoint ---
-@app.route('/', methods=['GET'])
+@app.route('/', methods=['GET', 'OPTIONS'])
 def health_check():
+    if request.method == 'OPTIONS':
+        return '', 204
     return jsonify({
         "status": "healthy",
         "message": "Speech Analysis API is running",
@@ -163,12 +194,16 @@ def health_check():
     }), 200
 
 # --- 7. The Main Flask Route ---
-@app.route('/analyze_conversation', methods=['POST'])
+@app.route('/analyze_conversation', methods=['POST', 'OPTIONS'])
 def handle_conversation_analysis():
     """
     Main endpoint to analyze speech from an audio file.
     Expects a POST request with 'audio_file' in multipart/form-data.
     """
+    
+    # Handle preflight OPTIONS request
+    if request.method == 'OPTIONS':
+        return '', 204
     
     if 'audio_file' not in request.files:
         return jsonify({"error": "No 'audio_file' part in the request"}), 400
@@ -204,15 +239,26 @@ def handle_conversation_analysis():
 
         # --- STEP 2: Separate Words by Speaker ---
         for word in transcript.words:
-            if word.speaker == 'A':
+            # Check if word has speaker attribute (some transcripts might not have diarization)
+            if hasattr(word, 'speaker'):
+                if word.speaker == 'A':
+                    speaker_a_words.append(word)
+                elif word.speaker == 'B':
+                    speaker_b_words.append(word)
+            else:
+                # If no speaker diarization, treat all as Speaker A
                 speaker_a_words.append(word)
-            elif word.speaker == 'B':
-                speaker_b_words.append(word)
 
         if not speaker_a_words and not speaker_b_words:
             return jsonify({"error": "Diarization failed. Could not assign words to speakers."}), 500
         
         print(f"Transcription complete. Speaker A: {len(speaker_a_words)} words, Speaker B: {len(speaker_b_words)} words")
+        
+        # Debug: Print first few words to see the structure
+        if speaker_a_words:
+            print(f"Sample Speaker A word: {speaker_a_words[0]}")
+        if speaker_b_words:
+            print(f"Sample Speaker B word: {speaker_b_words[0]}")
 
         # --- STEP 3: Score Both Speakers ---
         score_a = calculate_disfluency_score(speaker_a_words)
